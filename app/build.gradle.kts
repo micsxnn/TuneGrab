@@ -1,18 +1,25 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // Compilador Compose do Kotlin 2.x — liga o buildFeatures.compose.
+    id("org.jetbrains.kotlin.plugin.compose")
+    // @Serializable — serialização JSON usada pela camada de rede das letras.
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
     namespace = "com.tunegrab.app"
-    compileSdk = 34
+    // 34 → 37 (v0.22.16): o Backdrop 2.x e o Compose BOM 2026.06.01 do
+    // LastWave exigem APIs novas. targetSdk continua 34 — comportamento
+    // do app em runtime não muda.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.tunegrab.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 88
-        versionName = "0.22.15"
+        versionCode = 89
+        versionName = "0.22.16"
 
         // ABIs do motor yt-dlp embutido (python + ffmpeg são nativos).
         // x86/x86_64 ficam de fora para o APK não dobrar de tamanho —
@@ -44,11 +51,11 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
+        // Compose ligado: as bibliotecas de vidro (Backdrop/Shapes) são
+        // Compose Multiplatform — sem isso elas nem empacotam direito.
+        compose = true
         viewBinding = true
         // BuildConfig.VERSION_NAME na tela de boas-vindas e no rodapé do
         // Início (v0.18.8) — a versão mostrada nunca desatualiza
@@ -81,6 +88,13 @@ android {
 
     lint {
         abortOnError = false
+    }
+}
+
+// DSL novo do Kotlin 2.x (o kotlinOptions antigo saiu do Kotlin 2.4).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -126,4 +140,49 @@ dependencies {
     // na primeira execução de cada versão do app (UpdateChannel.STABLE).
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+
+    // =============================================================
+    // BIBLIOTECAS DO LASTWAVE-NATIVE (Clash-Projects) — v0.22.16
+    // Mesmas versões do gradle/libs.versions.toml deles. Fundação pra
+    // Liquid Glass + letras de música; a UI chega nas próximas versões.
+    // =============================================================
+
+    // Stack Compose mínima que o Backdrop exige (mesma combinação do
+    // LastWave: BOM 2026.06.01 + ui + ui-graphics + material3).
+    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // LIQUID GLASS do LastWave: Backdrop 2.0.1 (Kyant0/AndroidLiquidGlass,
+    // o motor do vidro deles) + Shapes 1.2.1 (formas iOS-like arredondadas).
+    implementation("io.github.kyant0:backdrop:2.0.1")
+    implementation("io.github.kyant0:shapes:1.2.1")
+
+    // Paleta: extrai a cor dominante da capa pra tingir o vidro (mesmo
+    // papel que no LastWave).
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
+    // InnerTubeX (MetrolistGroup) — cliente InnerTube do LastWave, o canal
+    // deles pra buscar streams E LETRAS. runtimeOnly igual no LastWave: a
+    // lib nasce com metadado Kotlin mais novo que o compilador do app, então
+    // quem chama é um adapter em runtime (ktor-client entra junto).
+    runtimeOnly("com.github.MetrolistGroup.innertubex:innertubex:0.11.2")
+    runtimeOnly("io.ktor:ktor-client-cio:3.6.0")
+
+    // Camada de rede do sistema de letras do LastWave: Retrofit + conversor
+    // kotlinx.serialization (mesma dupla do toml deles) + protobuf.
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.6.3")
+
+    // Parser HTML — raspagem das fontes de letras do LastWave.
+    implementation("org.jsoup:jsoup:1.18.3")
 }
