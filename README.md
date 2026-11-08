@@ -1,53 +1,80 @@
 <div align="center">
 
-<img src="assets/icon.png" width="160" alt="Logo do TuneGrab: ícone dourado com nota musical branca"/>
+<img src="assets/icon.png" width="160" alt="Ícone do TuneGrab: símbolo dourado com nota musical branca"/>
 
 # TuneGrab
 
-**Baixe músicas e vídeos do YouTube no Android. O download roda inteiro no
-próprio aparelho, sem servidor e sem anúncios.**
+**Baixe músicas e vídeos do YouTube no Android. O download roda inteiro no seu aparelho, sem servidor intermediário e sem anúncios.**
 
 [![Build](https://github.com/micsxnn/TuneGrab/actions/workflows/build.yml/badge.svg)](https://github.com/micsxnn/TuneGrab/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/micsxnn/TuneGrab)](https://github.com/micsxnn/TuneGrab/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/micsxnn/TuneGrab/total)](https://github.com/micsxnn/TuneGrab/releases)
 [![License](https://img.shields.io/github/license/micsxnn/TuneGrab)](LICENSE)
 ![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 
 [**Baixar a última versão (APK)**](https://github.com/micsxnn/TuneGrab/releases/latest) ·
 [**Instalação**](#instalação) ·
 [**Telas do app**](#telas-do-app) ·
 [**Como funciona**](#como-funciona) ·
-[**Roadmap**](#roadmap)
+[**Roadmap**](#roadmap) ·
+[**Problemas e sugestões**](https://github.com/micsxnn/TuneGrab/issues)
 
 </div>
 
 ---
 
+## Sumário
+
+- [O que é o TuneGrab](#o-que-é-o-tunegrab)
+- [Telas do app](#telas-do-app)
+- [Funcionalidades](#funcionalidades)
+  - [Downloads](#downloads)
+  - [Player](#player)
+  - [Biblioteca e navegação](#biblioteca-e-navegação)
+  - [Controle e segurança](#controle-e-segurança)
+- [Instalação](#instalação)
+- [Como funciona](#como-funciona)
+  - [Plano A: yt-dlp embutido](#plano-a-yt-dlp-embutido-motor-principal)
+  - [Plano B: NewPipeExtractor e PoToken](#plano-b-newpipeextractor-e-potoken-fallback)
+  - [PoToken e BotGuard](#potoken-e-botguard)
+- [Stack](#stack)
+- [Sobre o MP3](#sobre-o-mp3)
+- [Compilar a partir do código-fonte](#compilar-a-partir-do-código-fonte)
+- [O fork do NewPipeExtractor](#o-fork-do-newpipeextractor-motor-de-fallback)
+- [Roadmap](#roadmap)
+- [Contribuições](#contribuições)
+- [Aviso legal](#aviso-legal)
+- [Licença](#licença)
+
+---
+
 ## O que é o TuneGrab
 
-TuneGrab é um app Android que baixa áudio (MP3, M4A, OPUS) e vídeo (MP4/MKV)
-do YouTube e salva em `Downloads/TuneGrab`. O APK carrega um motor yt-dlp
-completo (Python, yt-dlp e ffmpeg embutidos), então o download funciona de
-fábrica e acontece inteiro no seu celular. Quando o YouTube muda alguma coisa,
-o motor se atualiza sozinho na próxima abertura. Você não precisa de root, de
-servidor ou de qualquer ferramenta instalada além do app.
+TuneGrab é um aplicativo Android para baixar áudio (MP3, M4A e OPUS) e vídeo
+(MP4 e MKV) do YouTube, salvando os arquivos em `Downloads/TuneGrab`.
 
-Dá para ouvir sem sair do TuneGrab: o player tem espectro de áudio real, letra
-sincronizada e fila da Biblioteca. As músicas preferidas ficam nos favoritos,
-e o resto se organiza em pastas.
+O APK carrega um motor yt-dlp completo, com interpretador Python, yt-dlp e
+ffmpeg empacotados. Por isso o download funciona de fábrica e acontece inteiro
+no seu celular. Quando o YouTube muda alguma coisa, o motor se atualiza sozinho
+na abertura seguinte. Não é preciso root, servidor nem qualquer ferramenta
+instalada além do app.
+
+O aplicativo também funciona como player: há espectro de áudio em tempo real,
+letra sincronizada e fila da biblioteca. As faixas preferidas ficam na aba de
+favoritos, e o restante da coleção se organiza em pastas.
 
 ## Telas do app
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/inicio.png" width="180" alt="Tela Início do TuneGrab"/><br><sub><b>Início</b> · cole o link e baixe</sub></td>
-    <td align="center"><img src="docs/screenshots/youtube.png" width="180" alt="Tela YouTube do TuneGrab, navegador embutido"/><br><sub><b>YouTube</b> · navegador embutido</sub></td>
-    <td align="center"><img src="docs/screenshots/downloads.png" width="180" alt="Tela Downloads do TuneGrab, central em tempo real"/><br><sub><b>Downloads</b> · central em tempo real</sub></td>
+    <td align="center"><img src="docs/screenshots/inicio.png" width="180" alt="Tela Início do TuneGrab, com campo de link e botão Baixar"/><br><sub><b>Início</b> · cole o link e baixe</sub></td>
+    <td align="center"><img src="docs/screenshots/youtube.png" width="180" alt="Tela YouTube do TuneGrab, com o navegador embutido"/><br><sub><b>YouTube</b> · navegador embutido</sub></td>
+    <td align="center"><img src="docs/screenshots/downloads.png" width="180" alt="Tela Downloads do TuneGrab, a central em tempo real"/><br><sub><b>Downloads</b> · central em tempo real</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/player.png" width="180" alt="Player do TuneGrab com espectro de áudio e letra sincronizada"/><br><sub><b>Player</b> · espectro e letra sincronizada</sub></td>
-    <td align="center"><img src="docs/screenshots/biblioteca.png" width="180" alt="Biblioteca do TuneGrab com pastas e busca"/><br><sub><b>Biblioteca</b> · pastas e favoritos</sub></td>
+    <td align="center"><img src="docs/screenshots/player.png" width="180" alt="Player do TuneGrab, com espectro de áudio e letra sincronizada"/><br><sub><b>Player</b> · espectro e letra sincronizada</sub></td>
+    <td align="center"><img src="docs/screenshots/biblioteca.png" width="180" alt="Biblioteca do TuneGrab, com pastas e busca"/><br><sub><b>Biblioteca</b> · pastas e favoritos</sub></td>
     <td align="center"><img src="docs/screenshots/favoritos.png" width="180" alt="Aba Favoritos do TuneGrab"/><br><sub><b>Favoritos</b> · sua seleção</sub></td>
   </tr>
 </table>
@@ -56,52 +83,57 @@ e o resto se organiza em pastas.
 
 ### Downloads
 
-- **Cole o link e toque em "Baixar"**: funciona de primeira, sem configurar nada
-- **Downloads em segundo plano**: serviço em primeiro plano com notificação de
+- **Download a partir de um link**: cole o endereço no campo do Início e toque
+  em Baixar. Funciona de primeira, sem configurar nada
+- **Download em segundo plano**: serviço em primeiro plano com notificação de
   progresso por fases (baixando, processando, salvando). Você pode fechar o app
-  e deixar baixando; download interrompido retoma de onde parou
-- **Playlist inteira**: link com `list=` no modo Playlist. Você escolhe formato
-  e qualidade uma vez, e os vídeos entram na fila um a um (até 100 por vez)
-- **4 formatos, qualidades configuradas separadamente** (em Config.):
-  - **MP3 320/256/192/128 kbps**, convertido no próprio celular com o ffmpeg
-    embutido, com tags ID3 e nome da música
-  - **M4A**: o áudio original do YouTube, sem reconversão (melhor fidelidade)
-  - **OPUS**: o áudio original em WebM, máxima qualidade por bit
-  - **Vídeo (MP4/MKV)** até **4K (2160p)**, com **todas as qualidades
+  e deixar baixando, e um download interrompido retoma de onde parou
+- **Playlist inteira**: um link com `list=` entra no modo Playlist. O formato e
+  a qualidade são escolhidos uma única vez, e os vídeos entram na fila um a um,
+  até 100 por vez
+- **4 formatos, com qualidades configuradas separadamente** (em Config.):
+  - **MP3** em 320, 256, 192 ou 128 kbps, convertido no próprio celular pelo
+    ffmpeg embutido, com tags ID3 e nome da música
+  - **M4A**: o áudio original do YouTube, sem reconversão e com a melhor
+    fidelidade disponível
+  - **OPUS**: o áudio original em WebM, a máxima qualidade por bit
+  - **Vídeo (MP4 e MKV) até 4K (2160p)**, com **todas as qualidades
     liberadas**. Acima de 720p o YouTube separa vídeo e áudio, então o app
-    baixa os dois e junta com o ffmpeg embutido **sem recodificar**. Até 1080p
-    o arquivo sai em **MP4/H.264**, que abre em qualquer lugar; **1440p e 4K
-    saem em MKV**, o contêiner nativo do YouTube nessas resoluções. A
-    notificação final confirma a resolução do arquivo salvo
-- **Escolha onde salvar**: qualquer pasta do aparelho em Config. → Pasta de
-  download (padrão: `Downloads/TuneGrab`, com fallback automático)
-- **Motor yt-dlp embutido e auto-atualizável** (canal estável): quando o
-  YouTube mudar algo, o TuneGrab se conserta na próxima abertura, sem
-  precisar de versão nova
-- **Fallback duplo em silêncio**: se o yt-dlp falhar, um segundo motor
-  (NewPipeExtractor + PoToken/BotGuard) assume e tenta de novo automaticamente
-- **Compartilhe direto do YouTube** ("Compartilhar → TuneGrab") e o download
-  começa na hora
-- Suporte a links `youtube.com`, `m.youtube.com`, `music.youtube.com`,
+    baixa as duas faixas e as une com o ffmpeg embutido **sem recodificar**.
+    Até 1080p o arquivo sai em **MP4/H.264**, que abre em qualquer lugar;
+    **1440p e 4K saem em MKV**, o contêiner nativo do YouTube nessas resoluções.
+    A notificação final confirma a resolução do arquivo salvo
+- **Escolha da pasta de destino**: qualquer pasta do aparelho, em Config. →
+  Pasta de download (padrão: `Downloads/TuneGrab`, com fallback automático)
+- **Motor yt-dlp embutido e auto-atualizável**: na primeira execução de cada
+  versão do app, o motor é atualizado pelo canal nightly do yt-dlp. Quando o
+  YouTube muda de comportamento, o TuneGrab se corrige sozinho na abertura
+  seguinte, sem exigir uma nova versão do aplicativo
+- **Fallback duplo e silencioso**: se o yt-dlp falhar, um segundo motor
+  (NewPipeExtractor com PoToken e BotGuard) assume e tenta de novo
+  automaticamente
+- **Compartilhamento direto do YouTube**: a opção Compartilhar → TuneGrab
+  dispara o download na hora
+- **Links aceitos**: `youtube.com`, `m.youtube.com`, `music.youtube.com`,
   `youtu.be`, Shorts e playlists
 
 ### Player
 
-- **Player embutido** com barra de progresso e **espectro de áudio real**
-  (barras que acompanham o som, sem permissão extra). A thumbnail entra
+- **Player embutido** com barra de progresso e **espectro de áudio real**, cujas
+  barras acompanham o som sem exigir permissão extra. A thumbnail entra
   **inteira** num retângulo 16:9 de largura cheia, sem barra sobrando, e o
   vídeo roda em tela cheia **sem deformar**
 - **Letra sincronizada**: o botão "Letra" busca a letra em tempo real na
   [LRCLIB](https://lrclib.net), fonte aberta. A linha acende no tempo do som e
-  a tela rola sozinha, estilo Spotify/YouTube Music. Nos testes com músicas
-  reais, a cobertura passou de 89%
-- **Música em segundo plano**: o som continua com o app fechado ou a tela
+  a tela rola sozinha, no estilo Spotify e YouTube Music. Nos testes com
+  músicas reais, a cobertura passou de 89%
+- **Reprodução em segundo plano**: o som continua com o app fechado ou a tela
   apagada, com **notificação de mídia** (play, pause, fechar). O vídeo cabe em
   uma **janelinha picture-in-picture**, igual YouTube Premium
-- **Fila anterior/próxima** da Biblioteca direto no player, com **reprodução
-  automática** por música (você liga e desliga nas Configurações)
-- **Favoritos**: coração disponível em cada música, no canto do player e no
-  card da Biblioteca. Os salvos aparecem numa aba própria na barra de
+- **Fila anterior e próximo** da Biblioteca direto no player, com
+  **reprodução automática** por música (você liga e desliga nas Configurações)
+- **Favoritos**: o coração está disponível em cada música, no canto do player e
+  no card da Biblioteca. As salvas aparecem numa aba própria na barra de
   navegação. Toque no card para **ouvir de novo**: favorito do YouTube refaz o
   fluxo de sempre; favorito de arquivo toca **na hora, direto do aparelho**
 
@@ -136,8 +168,10 @@ pastas TuneGrab são reencontradas pelo MediaStore.
 ## Instalação
 
 1. Abra a página de [**Releases**](https://github.com/micsxnn/TuneGrab/releases)
-2. Baixe o `TuneGrab-x.y.z.apk` da release mais recente (estável)
-3. Abra o APK e permita a instalação de fontes desconhecidas, se o Android pedir
+2. Baixe o arquivo `TuneGrab-x.y.z.apk` da release mais recente do canal
+   estável
+3. Abra o APK e permita a instalação de fontes desconhecidas, se o Android
+   pedir
 4. Cole um link e baixe a primeira música
 
 > **Por que o APK tem cerca de 100 MB?** Ele carrega um motor completo dentro
@@ -161,7 +195,7 @@ YouTube → TuneGrab (no seu celular) → Downloads/TuneGrab
            │
            ├─ PLANO B · NewPipeExtractor + PoToken/BotGuard (fallback
            │     automático, só entra se o Plano A falhar): WebView roda o
-           │     desafio anti-bot e minta PoTokens; cada URL é testado com
+           │     desafio anti-bot e minta PoTokens; cada URL é testada com
            │     um probe HTTP antes de baixar; retomada com Range/.part
            │
            ├─ RESGATE · se o anti-bot travar a extração, o yt-dlp lê os
@@ -170,7 +204,7 @@ YouTube → TuneGrab (no seu celular) → Downloads/TuneGrab
            │
            ├─ LETRAS · LRCLIB: busca em escada (exato → artista+faixa →
            │     solto → só faixa) escolhe o melhor candidato por duração
-           │     e sincronia; cache local
+           │     e sincroniza; cache local
            │
            └─ ffmpeg embutido: converte MP3/OPUS e junta vídeo+áudio do MP4
 ```
@@ -178,21 +212,21 @@ YouTube → TuneGrab (no seu celular) → Downloads/TuneGrab
 ### Plano A: yt-dlp embutido (motor principal)
 
 O yt-dlp é o downloader de YouTube mais maduro que existe, e mora dentro do
-APK. Ele faz o trabalho pesado: resolve os streams, baixa com até 5 tentativas,
-converte com o ffmpeg e entrega o arquivo pronto em `Downloads/TuneGrab`. O app
-checa atualizações do motor **uma vez por versão do app** (canal estável): se o
-YouTube mudar algo amanhã, o TuneGrab se conserta sozinho, sem você baixar
-versão nova. Quando o anti-bot aperta, você pode **logar sua conta do YouTube**
-(WebView no app ou import de `cookies.txt`); os cookies ficam guardados só no
-aparelho.
+APK. Ele faz o trabalho pesado: resolve os streams, baixa com até 5
+tentativas, converte com o ffmpeg e entrega o arquivo pronto em
+`Downloads/TuneGrab`. O app checa atualizações do motor **uma vez por versão
+do app**, pelo canal nightly do yt-dlp: se o YouTube mudar algo amanhã, o
+TuneGrab se conserta sozinho, sem você baixar versão nova. Quando o anti-bot
+aperta, você pode **logar sua conta do YouTube** (WebView no app ou import de
+`cookies.txt`); os cookies ficam guardados só no aparelho.
 
-### Plano B: NewPipeExtractor + PoToken (fallback)
+### Plano B: NewPipeExtractor e PoToken (fallback)
 
 Se o Plano A falhar (rede instável, por exemplo), o Plano B assume em silêncio.
 O NewPipeExtractor (engine do NewPipe) resolve os streams com **PoTokens
 gerados localmente** num WebView fora da tela. Cada URL é validada com um
-*probe* HTTP (Range 0–1) antes de entrar na lista de opções, e o download usa
-OkHttp com retomada de arquivo `.part`. O arquivo só chega na sua pasta se
+*probe* HTTP (Range 0 a 1) antes de entrar na lista de opções, e o download
+usa OkHttp com retomada de arquivo `.part`. O arquivo só chega na sua pasta se
 passar na validação de tamanho; você não vai encontrar MP3 corrompido ou de
 2 KB por causa de uma falha silenciosa.
 
@@ -200,75 +234,7 @@ A arquitetura tem custo zero de infraestrutura e protege sua privacidade:
 nenhum servidor intermediário vê o que você baixa. E como são dois motores
 independentes, a falha de um não derruba o download.
 
-## Stack
-
-| Camada | Tecnologia |
-|---|---|
-| Linguagem | Kotlin |
-| UI | Material 3 (Views + ViewBinding), paleta dourada própria |
-| Motor principal | [yt-dlp](https://github.com/yt-dlp/yt-dlp) embutido via [youtubedl-android](https://github.com/JunkFood02/youtubedl-android): Python + QuickJS no APK |
-| Conversão/Merge | ffmpeg embutido (MP3, OPUS, MP4) |
-| Fallback | [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) com [fork compatível com Android antigo](https://github.com/micsxnn/NewPipeExtractor) + PoToken/BotGuard |
-| Letras sincronizadas | [LRCLIB](https://lrclib.net) (API aberta, sem chave) |
-| Player | MediaPlayer (local/muxed) + Media3/ExoPlayer (DASH HD) + PiP |
-| Espectro de áudio | FFT próprio (2048 pontos, 28 bandas log) espiando o PCM no ExoPlayer |
-| Conversão legada | LAME 3.100 (libmp3lame) via NDK + MediaCodec |
-| Rede | OkHttp |
-| Imagens | Coil |
-| Mínimo | Android 7.0 (API 24) |
-| Alvo | Android 14 (API 34) |
-
-## Sobre o MP3 (transparência)
-
-O YouTube não entrega MP3: a fonte só tem **M4A (AAC)** e **Opus**. Por isso o
-TuneGrab **converte no seu aparelho**. O ffmpeg embutido baixa a melhor faixa
-de áudio disponível e recodifica para o bitrate escolhido (320/256/192/128
-kbps), com tags ID3. Um detalhe técnico honesto: a fonte do YouTube tem até
-cerca de 160 kbps, então um MP3 320 preserva qualidade, mas não adiciona. É o
-padrão que muita gente pede pela compatibilidade com players, pen drives e som
-de carro. Para máxima fidelidade sem reconversão, escolha **M4A** ou **OPUS**.
-
-## Compilar a partir do código-fonte
-
-Requisitos: JDK 17, Android SDK 34 e NDK/CMake (o Gradle baixa o que faltar).
-
-```bash
-./gradlew assembleRelease   # APK assinado em app/build/outputs/apk/release/
-./gradlew assembleDebug     # APK de debug
-```
-
-O GitHub Actions compila e publica automaticamente a cada tag `v*`.
-
-> **Nota sobre a assinatura:** o keystore de release (`app/keystore/`) está
-> commitado com senha pública de propósito, para garantir builds reprodutíveis
-> que se atualizam entre versões. É uma escolha aceitável para um app gratuito
-> e sem dados sensíveis; para uso comercial, mova o keystore para *GitHub
-> Secrets*.
-
-## Sobre o fork do NewPipeExtractor (motor de fallback)
-
-O fallback do TuneGrab usa um fork próprio do NewPipeExtractor, mantido neste
-perfil. A v0.26.5 oficial usa `URLDecoder.decode(String, Charset)`,
-`URLEncoder.encode(String, Charset)` (Java 10) e `String.isBlank()` (Java 11),
-APIs que só existem no **Android 13 (API 33) ou mais novo**. Em aparelhos mais
-antigos isso lança `NoSuchMethodError`. O
-[fork `micsxnn/NewPipeExtractor`](https://github.com/micsxnn/NewPipeExtractor)
-corrige isso e adiciona proteções contra as mudanças recentes do YouTube:
-
-1. **Compatibilidade com Android anterior ao 13**: overloads legacy de
-   URLDecoder/URLEncoder e `isBlank` reimplementado.
-2. **Clients extras de streams**: iOS e visionOS (android_vr) como rotas
-   anônimas de streams diretos.
-3. **Fallback de bot-check em cascata**: quando o YouTube responde *"Sign in
-   to confirm you're not a bot"* ao client Android, o extractor tenta WEB com
-   PoToken, depois iOS e visionOS.
-4. **Suporte completo a `PoTokenProvider`**: inclui player requests dos
-   clients WEB, iOS e Android com PoToken, inexistentes na v0.26.5 oficial.
-
-Assim que o upstream corrigir essas questões, o fork pode ser substituído pela
-versão oficial.
-
-## Como o fallback lida com o anti-bot do YouTube (PoToken/BotGuard)
+### PoToken e BotGuard
 
 O YouTube exige *proof-of-origin tokens* (PoTokens) e responde *"Sign in to
 confirm you're not a bot"* para clientes anônimos, inclusive apps. O Plano B
@@ -293,6 +259,76 @@ clients anônimos com iOS à frente.
 
 O Plano A (yt-dlp embutido) resolve quase tudo sozinho; esse mecanismo é a
 reserva para quando a coisa aperta.
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Linguagem | Kotlin 2.4 |
+| UI | Material 3 (Views + ViewBinding), paleta dourada própria |
+| Motor principal | [yt-dlp](https://github.com/yt-dlp/yt-dlp) embutido via [youtubedl-android](https://github.com/JunkFood02/youtubedl-android): Python + QuickJS no APK |
+| Conversão/Merge | ffmpeg embutido (MP3, OPUS, MP4) |
+| Fallback | [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) com [fork compatível com Android antigo](https://github.com/micsxnn/NewPipeExtractor) + PoToken/BotGuard |
+| Letras sincronizadas | [LRCLIB](https://lrclib.net) (API aberta, sem chave) |
+| Player | MediaPlayer (local/muxed) + Media3/ExoPlayer (DASH HD) + PiP |
+| Espectro de áudio | FFT próprio (2048 pontos, 28 bandas log) espiando o PCM no ExoPlayer |
+| Conversão legada | LAME 3.100 (libmp3lame) via NDK + MediaCodec |
+| Rede | OkHttp |
+| Imagens | Coil |
+| Build | Gradle 9.3, AGP 9.1, JDK 17, NDK + CMake 3.22 |
+| Mínimo | Android 7.0 (API 24) |
+| Alvo | Android 14 (API 34) |
+
+## Sobre o MP3
+
+O YouTube não entrega MP3: a fonte só tem **M4A (AAC)** e **Opus**. Por isso
+o TuneGrab **converte no seu aparelho**. O ffmpeg embutido baixa a melhor
+faixa de áudio disponível e recodifica para o bitrate escolhido (320, 256, 192
+ou 128 kbps), com tags ID3. Um detalhe técnico honesto: a fonte do YouTube tem
+até cerca de 160 kbps, então um MP3 320 preserva qualidade, mas não adiciona.
+É o padrão que muita gente pede pela compatibilidade com players, pen drives e
+som de carro. Para máxima fidelidade sem reconversão, escolha **M4A** ou
+**OPUS**.
+
+## Compilar a partir do código-fonte
+
+Requisitos: JDK 17, Android SDK 37 e NDK/CMake (o Gradle baixa o que faltar).
+
+```bash
+./gradlew assembleRelease   # APK assinado em app/build/outputs/apk/release/
+./gradlew assembleDebug     # APK de debug
+```
+
+O GitHub Actions compila e publica automaticamente a cada tag `v*`.
+
+> **Nota sobre a assinatura:** o keystore de release (`app/keystore/`) está
+> commitado com senha pública de propósito, para garantir builds reprodutíveis
+> que se atualizam entre versões. É uma escolha aceitável para um app gratuito
+> e sem dados sensíveis; para uso comercial, mova o keystore para *GitHub
+> Secrets*.
+
+## O fork do NewPipeExtractor (motor de fallback)
+
+O fallback do TuneGrab usa um fork próprio do NewPipeExtractor, mantido neste
+perfil. A v0.26.5 oficial usa `URLDecoder.decode(String, Charset)`,
+`URLEncoder.encode(String, Charset)` (Java 10) e `String.isBlank()` (Java 11),
+APIs que só existem no **Android 13 (API 33) ou mais novo**. Em aparelhos mais
+antigos isso lança `NoSuchMethodError`. O
+[fork `micsxnn/NewPipeExtractor`](https://github.com/micsxnn/NewPipeExtractor)
+corrige isso e adiciona proteções contra as mudanças recentes do YouTube:
+
+1. **Compatibilidade com Android anterior ao 13**: overloads legacy de
+   URLDecoder/URLEncoder e `isBlank` reimplementado.
+2. **Clients extras de streams**: iOS e visionOS (android_vr) como rotas
+   anônimas de streams diretos.
+3. **Fallback de bot-check em cascata**: quando o YouTube responde *"Sign in
+   to confirm you're not a bot"* ao client Android, o extractor tenta WEB com
+   PoToken, depois iOS e visionOS.
+4. **Suporte completo a `PoTokenProvider`**: inclui player requests dos
+   clients WEB, iOS e Android com PoToken, inexistentes na v0.26.5 oficial.
+
+Assim que o upstream corrigir essas questões, o fork pode ser substituído pela
+versão oficial.
 
 ## Roadmap
 
@@ -336,8 +372,16 @@ reserva para quando a coisa aperta.
 - [x] **Biblioteca limpa: menu de três pontinhos (⋮) no lugar da fileira de botões e thumbnail inteira no player** (v0.22.13)
 - [x] **Moldura perfeita: thumbnail em retângulo 16:9 de largura cheia (zero barra sobrando) e coração que segue a fila da Biblioteca** (v0.22.14)
 - [x] **Update sempre atento: endpoint no endereço novo do projeto e canal reserva (feed de releases) quando a API do GitHub falha** (v0.22.15)
+- [x] **Base técnica do Liquid Glass e do novo sistema de letras (Backdrop, Shapes, InnerTubeX, Retrofit e Jsoup)** (v0.22.16)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
+
+## Contribuições
+
+Correções, relatos de problema e novas ideias são bem-vindos no
+[rastreador de issues](https://github.com/micsxnn/TuneGrab/issues). Mantenha o
+foco de cada alteração em um único tema e descreva o comportamento antes e
+depois da mudança.
 
 ## Aviso legal
 
