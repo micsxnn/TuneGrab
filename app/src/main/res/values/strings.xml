@@ -402,6 +402,12 @@
     <string name="lyrics_retry">Tentar de novo</string>
     <string name="lyrics_instrumental">Essa faixa é instrumental — é só curtir a música!</string>
     <string name="lyrics_credit">Letras: LRCLIB</string>
+    <!-- v0.22.17: as fontes de letra do LastWave -->
+    <string name="lyrics_source_button">Fonte</string>
+    <string name="lyrics_source_title">De onde buscar a letra</string>
+    <string name="lyrics_source_auto">Automático</string>
+    <string name="lyrics_credit_source">Letra: %1$s</string>
+    <string name="lyrics_credit_word">Letra: %1$s (palavra a palavra)</string>
     <string name="notif_channel_playback">Reprodução</string>
     <string name="notif_channel_playback_desc">Controles da música que está tocando em segundo plano</string>
     <string name="dl_not_found">Arquivo não encontrado para compartilhar — confira na aba Biblioteca.</string>

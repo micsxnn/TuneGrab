@@ -630,7 +630,11 @@ class PlayerActivity : AppCompatActivity() {
             val uri = svc?.currentUri() ?: initialUri ?: return@setOnClickListener
             val title = svc?.currentTitle() ?: initialTitle
             val dur = svc?.duration() ?: 0
-            startActivity(LyricsActivity.start(this, uri.toString(), title, dur))
+            // O link do YouTube vai junto: é o que libera as fontes que
+            // casam a letra pelo VÍDEO (legendas do YouTube e o banco do
+            // vídeo). Em arquivo local, fica null e elas simplesmente não
+            // entram na corrida.
+            startActivity(LyricsActivity.start(this, uri.toString(), title, dur, sourceUrl))
         }
 
         tickHandler.post(tick)

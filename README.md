@@ -123,10 +123,15 @@ favoritos, e o restante da coleção se organiza em pastas.
   barras acompanham o som sem exigir permissão extra. A thumbnail entra
   **inteira** num retângulo 16:9 de largura cheia, sem barra sobrando, e o
   vídeo roda em tela cheia **sem deformar**
-- **Letra sincronizada**: o botão "Letra" busca a letra em tempo real na
-  [LRCLIB](https://lrclib.net), fonte aberta. A linha acende no tempo do som e
-  a tela rola sozinha, no estilo Spotify e YouTube Music. Nos testes com
-  músicas reais, a cobertura passou de 89%
+- **Letra sincronizada**: o botão "Letra" busca a letra em **12 catálogos ao
+  mesmo tempo** (LRCLIB, Apple Music, BetterLyrics, QQ Karaoke, Kugou,
+  LyricsPlus, Unison, Syllable-Sync, lrc.red, banco do vídeo, Megalobiz e
+  Genius) e fica com a melhor resposta. Quando a fonte entrega o tempo de
+  cada **palavra**, a letra acende palavra a palavra, no estilo karaokê; com
+  tempo de linha, acende o verso inteiro. Os dados vêm da
+  [LRCLIB](https://lrclib.net) e de fontes abertas parecidas
+- **Você escolhe a fonte**: o botão "Fonte" no alto da tela da letra trava de
+  onde a letra vem, para quando uma resposta vier errada
 - **Reprodução em segundo plano**: o som continua com o app fechado ou a tela
   apagada, com **notificação de mídia** (play, pause, fechar). O vídeo cabe em
   uma **janelinha picture-in-picture**, igual YouTube Premium
@@ -202,9 +207,12 @@ YouTube → TuneGrab (no seu celular) → Downloads/TuneGrab
            │     metadados (título, canal, qualidades) e o seletor abre
            │     com a mesma cara de sempre; o download sai pelo Plano A
            │
-           ├─ LETRAS · LRCLIB: busca em escada (exato → artista+faixa →
-           │     solto → só faixa) escolhe o melhor candidato por duração
-           │     e sincroniza; cache local
+           ├─ LETRAS · 12 fontes abertas em paralelo (LRCLIB, Apple Music,
+           │     BetterLyrics, QQ Karaoke, Kugou, LyricsPlus, Unison,
+           │     Syllable-Sync, lrc.red, banco do vídeo, Megalobiz,
+           │     Genius): vence a melhor, com tempo de PALAVRA quando a
+           │     fonte dá; o usuário pode travar a fonte no botão "Fonte";
+           │     as legendas do próprio vídeo entram pelo InnerTubeX
            │
            └─ ffmpeg embutido: converte MP3/OPUS e junta vídeo+áudio do MP4
 ```
@@ -269,7 +277,8 @@ reserva para quando a coisa aperta.
 | Motor principal | [yt-dlp](https://github.com/yt-dlp/yt-dlp) embutido via [youtubedl-android](https://github.com/JunkFood02/youtubedl-android): Python + QuickJS no APK |
 | Conversão/Merge | ffmpeg embutido (MP3, OPUS, MP4) |
 | Fallback | [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) com [fork compatível com Android antigo](https://github.com/micsxnn/NewPipeExtractor) + PoToken/BotGuard |
-| Letras sincronizadas | [LRCLIB](https://lrclib.net) (API aberta, sem chave) |
+| Letras sincronizadas | 12 fontes abertas (LRCLIB, Apple Music, BetterLyrics, Kugou, LyricsPlus, Unison, Syllable-Sync, lrc.red, Genius, entre outras) + legendas do YouTube |
+| Rede das letras | Retrofit 2.11 + kotlinx.serialization (JSON e protobuf) + OkHttp + jsoup (raspagem HTML) |
 | Player | MediaPlayer (local/muxed) + Media3/ExoPlayer (DASH HD) + PiP |
 | Espectro de áudio | FFT próprio (2048 pontos, 28 bandas log) espiando o PCM no ExoPlayer |
 | Conversão legada | LAME 3.100 (libmp3lame) via NDK + MediaCodec |
@@ -373,6 +382,7 @@ versão oficial.
 - [x] **Moldura perfeita: thumbnail em retângulo 16:9 de largura cheia (zero barra sobrando) e coração que segue a fila da Biblioteca** (v0.22.14)
 - [x] **Update sempre atento: endpoint no endereço novo do projeto e canal reserva (feed de releases) quando a API do GitHub falha** (v0.22.15)
 - [x] **Base técnica do Liquid Glass e do novo sistema de letras (Backdrop, Shapes, InnerTubeX, Retrofit e Jsoup)** (v0.22.16)
+- [x] **Letra de verdade: 12 fontes em paralelo, tempo por palavra (karaokê) e botão de escolher a fonte** (v0.22.17)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

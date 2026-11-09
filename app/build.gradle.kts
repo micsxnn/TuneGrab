@@ -18,8 +18,8 @@ android {
         applicationId = "com.tunegrab.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 89
-        versionName = "0.22.16"
+        versionCode = 90
+        versionName = "0.22.17"
 
         // ABIs do motor yt-dlp embutido (python + ffmpeg são nativos).
         // x86/x86_64 ficam de fora para o APK não dobrar de tamanho —
@@ -171,18 +171,25 @@ dependencies {
 
     // InnerTubeX (MetrolistGroup) — cliente InnerTube do LastWave, o canal
     // deles pra buscar streams E LETRAS. runtimeOnly igual no LastWave: a
-    // lib nasce com metadado Kotlin mais novo que o compilador do app, então
-    // quem chama é um adapter em runtime (ktor-client entra junto).
+    // lib nasce com metadado Kotlin mais novo que o compilador — chamada via
+    // adapter em runtime (ktor-client entra junto).
     runtimeOnly("com.github.MetrolistGroup.innertubex:innertubex:0.11.2")
     runtimeOnly("io.ktor:ktor-client-cio:3.6.0")
+    // Engine do Ktor com o mesmo caminho de TLS do OkHttp do app: o InnerTubeX
+    // fala Ktor, e o engine do CIO falha no Android quando a app tem
+    // cleartext liberado no network_security_config.
+    runtimeOnly("io.ktor:ktor-client-okhttp:3.6.0")
 
-    // Camada de rede do sistema de letras do LastWave: Retrofit + conversor
-    // kotlinx.serialization (mesma dupla do toml deles) + protobuf.
+    // Camada de rede do sistema de letras (v0.22.17): Retrofit + conversor
+    // kotlinx.serialization + JSON e protobuf. A versão do runtime sobe
+    // pra 1.12.0 porque é a que o Kotlin 2.4.10 (compilador do app) e o
+    // LastWave usam — o 1.6.3 era do Kotlin 1.9 e o plugin de serialização
+    // do 2.4 exige o runtime mais novo.
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.12.0")
 
-    // Parser HTML — raspagem das fontes de letras do LastWave.
+    // Parser HTML — raspagem das fontes de letra (Genius).
     implementation("org.jsoup:jsoup:1.18.3")
 }

@@ -12,10 +12,15 @@ import android.os.Looper
 import android.view.View
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.tunegrab.app.databinding.ActivityLyricsBinding
+import com.tunegrab.app.lyrics.LyricsFetcher
+import com.tunegrab.app.lyrics.LyricsRepository
+import com.tunegrab.app.lyrics.LyricsResult
+import com.tunegrab.app.lyrics.LyricsSource
 import com.tunegrab.app.playback.PlaybackService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,18 +29,21 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 /**
- * GERADOR DE LETRA (v0.22.7, pedido do autor: "Faça o gerador de letra"):
- * a tela da letra da faixa que está tocando. Aberta pelo botão "Letra" do
- * player, ela conversa com o MESMO PlaybackService (a música NUNCA para nem
- * recomeça — aqui é só interface, igual na PlayerActivity):
+ * GERADOR DE LETRA (v0.22.7; v0.22.17 — as fontes do LastWave entraram de
+ * verdade): a tela da letra da faixa que está tocando. Aberta pelo botão
+ * "Letra" do player, ela conversa com o MESMO PlaybackService (a música
+ * NUNCA para nem recomeça — aqui é só interface, igual na PlayerActivity):
  *
- *  - Letra SINCRONIZADA (formato LRC da LRCLIB): a linha do momento acende
- *    no tempo do som e a tela anda sozinha (estilo Spotify/YouTube Music).
- *    Toque num verso pra pular a música pra ele (só quando esta faixa é que
- *    está tocando);
- *  - Letra SIMPLES: texto inteiro, sem sincronia;
- *  - Instrumental: a tela explica e pede pra curtir;
+ *  - Letra SINCRONIZADA: a linha do momento acende no tempo do som e a tela
+ *    anda sozinha (estilo Spotify/YouTube Music). Quando a fonte entrega o
+ *    tempo de cada PALAVRA, acende palavra a palavra (karaokê).
+ *  - Letra SIMPLES: texto inteiro, sem sincronia.
+ *  - Instrumental: a tela explica e pede pra curtir.
  *  - Sem letra / sem internet: mensagem com botão pra tentar de novo.
+ *
+ * O botão "Fonte" (canto da tela) deixa o usuário TRAVAR de onde a letra
+ * vem: em vez de a corrida entre todas as fontes, só a escolhida responde.
+ * É o jeito de resolver "essa letra tá errada, me dá a de outro lugar".
  *
  * A faixa pulou (fila, notificação, auto-advance)? O tick percebe que o
  * serviço mudou de faixa e busca a letra da nova SOZINHO.
@@ -60,11 +68,19 @@ class LyricsActivity : AppCompatActivity() {
 
     // estado da tela
     private var loadedKey: String? = null      // uri da faixa cuja letra está na tela
-    private var result: LyricsResult? = null
+    private var result: LyricsResult.Success? = null
     private var lineViews: List<TextView>? = null
     private var currentLine = -1
     private var loadJob: Job? = null
     private var initialDuration = 0
+
+    /** Fonte travada pelo usuário (null = corrida automática). */
+    private var forcedSource: LyricsSource? = null
+
+    // O link do YouTube da faixa (quando veio de lá): é o que dá pra
+    // buscar a letra CASADA COM O VÍDEO (legendas do YouTube, banco do
+    // vídeo). Null pra arquivo local.
+    private var sourceUrl: String? = null
 
     // usuário rolou a letra pra reler um trecho? o auto-scroll respeita e
     // volta a andar sozinho depois de uns segundos
@@ -90,6 +106,7 @@ class LyricsActivity : AppCompatActivity() {
             }
         })
         binding.btnRetry.setOnClickListener { reloadFromService() }
+        binding.btnSource.setOnClickListener { showSourcePicker() }
         binding.svLyrics.setOnTouchListener { _, _ ->
             lastUserScroll = System.currentTimeMillis()
             false
@@ -106,6 +123,7 @@ class LyricsActivity : AppCompatActivity() {
         initialDuration = intent.getIntExtra(EXTRA_DURATION_MS, 0)
         val uriStr = intent.getStringExtra(EXTRA_URI)
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        sourceUrl = intent.getStringExtra(EXTRA_SOURCE_URL)
         binding.tvHeader.text = title
         if (uriStr != null) {
             loadedKey = uriStr
@@ -136,10 +154,10 @@ class LyricsActivity : AppCompatActivity() {
         if (binding.tvHeader.text.toString() != svc.currentTitle()) {
             binding.tvHeader.text = svc.currentTitle()
         }
-        if (result?.synced != null) highlight(svc.position())
+        if (result?.isSynced == true) highlight(svc.position())
     }
 
-    /** Busca a letra da faixa [uriStr] (lavagem do título + LRCLIB em IO). */
+    /** Busca a letra da faixa [uriStr] (lavagem do título + as fontes). */
     private fun load(uriStr: String, title: String) {
         loadJob?.cancel()
         showLoading()
@@ -149,15 +167,29 @@ class LyricsActivity : AppCompatActivity() {
             } catch (ignored: Throwable) {
                 initialDuration
             }
+            val videoId = LyricsFetcher.videoIdOf(sourceUrl)
             val q = withContext(Dispatchers.IO) {
-                LyricsFetcher.buildQuery(applicationContext, title, uriStr, durMs)
+                LyricsFetcher.buildQuery(applicationContext, title, uriStr, durMs, videoId)
             }
             try {
-                val res = LyricsFetcher.fetch(q)
+                val res = LyricsRepository.fetch(q, forcedSource)
                 if (isFinishing || isDestroyed || loadedKey != uriStr) return@launch
-                result = res
-                if (res == null) showState(getString(R.string.lyrics_not_found), true)
-                else showLyrics(res)
+                when (res) {
+                    is LyricsResult.Success -> {
+                        result = res
+                        showLyrics(res)
+                    }
+
+                    LyricsResult.Empty -> {
+                        result = null
+                        showState(getString(R.string.lyrics_not_found), true)
+                    }
+
+                    is LyricsResult.Error -> {
+                        result = null
+                        showState(getString(R.string.lyrics_error), true)
+                    }
+                }
             } catch (ignored: IOException) {
                 if (isFinishing || isDestroyed || loadedKey != uriStr) return@launch
                 result = null
@@ -177,6 +209,26 @@ class LyricsActivity : AppCompatActivity() {
         load(uri, playback?.currentTitle() ?: binding.tvHeader.text.toString())
     }
 
+    /**
+     * Escolhe de onde a letra vem. "Automático" volta pro modo corrida (a
+     * melhor fonte que responder primeiro); qualquer outra trava a busca
+     * naquela fonte só.
+     */
+    private fun showSourcePicker() {
+        val entries = LyricsSource.entries
+        val labels = entries.map { it.label }.toTypedArray()
+        val checked = forcedSource?.let { src -> entries.indexOf(src) } ?: 0
+        AlertDialog.Builder(this)
+            .setTitle(R.string.lyrics_source_title)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                forcedSource = if (which == 0) null else entries[which]
+                dialog.dismiss()
+                reloadFromService()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     // ---------- estados da tela ----------
 
     private fun showLoading() {
@@ -187,6 +239,10 @@ class LyricsActivity : AppCompatActivity() {
         binding.svPlain.visibility = View.GONE
         currentLine = -1
         lineViews = null
+        binding.tvCredit.text = getString(
+            R.string.lyrics_credit_source,
+            forcedSource?.label ?: getString(R.string.lyrics_source_auto),
+        )
     }
 
     private fun showState(message: String, retry: Boolean) {
@@ -198,26 +254,31 @@ class LyricsActivity : AppCompatActivity() {
         binding.btnRetry.visibility = if (retry) View.VISIBLE else View.GONE
     }
 
-    private fun showLyrics(res: LyricsResult) {
+    private fun showLyrics(res: LyricsResult.Success) {
         binding.progressLyrics.visibility = View.GONE
         when {
             // instrumental sem letra nenhuma: nada pra mostrar além do recado
-            res.instrumental && res.plain.isBlank() ->
+            res.isInstrumental && res.plainLyrics.isNullOrBlank() ->
                 showState(getString(R.string.lyrics_instrumental), false)
 
-            res.synced != null -> {
+            res.isSynced && res.lines.isNotEmpty() -> {
                 binding.stateBox.visibility = View.GONE
                 binding.svPlain.visibility = View.GONE
-                buildSynced(res.synced)
+                buildSynced(res.lines)
                 binding.svLyrics.visibility = View.VISIBLE
             }
 
             else -> {
                 binding.stateBox.visibility = View.GONE
                 binding.svLyrics.visibility = View.GONE
-                binding.tvPlain.text = res.plain
+                binding.tvPlain.text = res.plainLyrics.orEmpty()
                 binding.svPlain.visibility = View.VISIBLE
             }
+        }
+        binding.tvCredit.text = if (res.isWordSynced) {
+            getString(R.string.lyrics_credit_word, res.sourceLabel)
+        } else {
+            getString(R.string.lyrics_credit_source, res.sourceLabel)
         }
     }
 
@@ -228,7 +289,7 @@ class LyricsActivity : AppCompatActivity() {
      * em memória: centenas de TextView é nada, e o toque/destaque fica
      * trivial — sem adapter, sem recycle, sem holder sujo).
      */
-    private fun buildSynced(lines: List<LyricLine>) {
+    private fun buildSynced(lines: List<com.tunegrab.app.lyrics.LyricLine>) {
         binding.llLyrics.removeAllViews()
         currentLine = -1
         val views = ArrayList<TextView>(lines.size)
@@ -246,7 +307,7 @@ class LyricsActivity : AppCompatActivity() {
                 lastUserScroll = System.currentTimeMillis()
                 val svc = playback
                 val uri = svc?.currentUri()?.toString()
-                if (svc != null && uri == loadedKey) svc.seekTo(lines[i].timeMs)
+                if (svc != null && uri == loadedKey) svc.seekTo(line.timeMs.toInt())
             }
             binding.llLyrics.addView(tv)
             views.add(tv)
@@ -263,11 +324,12 @@ class LyricsActivity : AppCompatActivity() {
      */
     private fun highlight(posMs: Int) {
         val views = lineViews ?: return
-        val lines = result?.synced ?: return
+        val lines = result?.lines ?: return
         if (views.size != lines.size) return
+        val now = posMs.toLong()
         var idx = -1
         for (i in lines.indices) {
-            if (lines[i].timeMs <= posMs) idx = i else break
+            if (lines[i].timeMs <= now) idx = i else break
         }
         if (idx == currentLine) return
         currentLine = idx
@@ -315,11 +377,21 @@ class LyricsActivity : AppCompatActivity() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_DURATION_MS = "duration_ms"
 
+        /** O link do YouTube da faixa (opcional): libera as fontes por vídeo. */
+        const val EXTRA_SOURCE_URL = "source_url"
+
         /** Abre a tela da letra pra faixa que o player está tocando. */
-        fun start(ctx: Context, uri: String, title: String, durationMs: Int): Intent =
+        fun start(
+            ctx: Context,
+            uri: String,
+            title: String,
+            durationMs: Int,
+            sourceUrl: String? = null,
+        ): Intent =
             Intent(ctx, LyricsActivity::class.java)
                 .putExtra(EXTRA_URI, uri)
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_DURATION_MS, durationMs)
+                .putExtra(EXTRA_SOURCE_URL, sourceUrl)
     }
 }
