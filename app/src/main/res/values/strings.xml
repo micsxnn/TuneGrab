@@ -414,7 +414,7 @@
 
     <!-- Atualização (v0.19.9: o card vive no INÍCIO; toque abre o que
          veio de novo e de lá a pessoa atualiza — zero links externos) -->
-    <string name="upd_available">TuneGrab %s disponível 🎉</string>
+    <string name="upd_available">TuneGrab %s disponível</string>
     <string name="upd_no_notes">Sem notas de versão.</string>
     <string name="cd_close_update">Dispensar aviso de atualização</string>
     <string name="upd_tap_see">Toque pra ver o que veio de novo</string>

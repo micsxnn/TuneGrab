@@ -1,13 +1,8 @@
-A letra da música ficou muito melhor.
+O download não morre mais quando você sai do app.
 
-Agora o app procura a letra em vários lugares ao mesmo tempo e fica com a
-melhor resposta. Quando a fonte sabe o tempo de cada palavra, a letra acende
-palavra a palavra, no estilo karaokê. Quando ela só sabe o tempo do verso,
-acende o verso inteiro, do jeito que já funcionava.
+Agora dá pra começar a baixar uma música, pular pra outra aba, fechar o app
+tranquilamente e voltar depois: a música continua baixando em segundo plano e
+o app avisa quando terminar. Se o Android precisar liberar memória no meio do
+caminho, o download volta de onde parou em vez de recomeçar do zero.
 
-Tem também um botão novo, "Fonte", no alto da tela da letra. Ele existe para
-quando uma resposta vier errada: você escolhe de onde a letra vem, o app
-busca só lá, e dá para voltar para o automático quando quiser. Entre as opções
-estão Apple Music, Kugou, LRCLIB e Genius, entre outras.
-
-O resto do TuneGrab segue igual, na mesma rapidez de sempre. Boa audição.
+Também saiu o emoji de festa do aviso de versão nova. Era brega mesmo.

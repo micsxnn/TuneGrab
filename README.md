@@ -383,6 +383,7 @@ versão oficial.
 - [x] **Update sempre atento: endpoint no endereço novo do projeto e canal reserva (feed de releases) quando a API do GitHub falha** (v0.22.15)
 - [x] **Base técnica do Liquid Glass e do novo sistema de letras (Backdrop, Shapes, InnerTubeX, Retrofit e Jsoup)** (v0.22.16)
 - [x] **Letra de verdade: 12 fontes em paralelo, tempo por palavra (karaokê) e botão de escolher a fonte** (v0.22.17)
+- [x] **Download que não morre: continua em segundo plano ao trocar de aba ou fechar o app, e retoma do ponto em que parou** (v0.22.18)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

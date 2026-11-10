@@ -18,6 +18,7 @@ import android.provider.MediaStore
 import android.text.format.Formatter
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import com.tunegrab.app.CrashReportActivity
 import com.tunegrab.app.MainActivity
@@ -94,6 +95,43 @@ class DownloadService : Service() {
     /** Última notificação de progresso — reexibida em starts de controle. */
     @Volatile private var lastProgressNotif: Notification? = null
 
+    /**
+     * v0.22.18: o download NÃO pode morrer quando o app é fechado dos recentes
+     * nem quando o usuário troca de aba. O Android chama [onTaskRemoved] quando
+     * a task da Activity é removida e, logo depois, DESTRÓI o Service (o
+     * onDestroy cancelava o scope e matava o python/OkHttp no meio do
+     * download — o sintoma era "fechei o app e a música parou de baixar").
+     *
+     * Esta flag separa as duas mortes:
+     *  - true  = o app foi fechado dos recentes → o Service é destruído, mas
+     *            o trabalho de DOWNLOAD deve CONTINUAR (o job é relançado).
+     *  - false = morte sem aviso (forçar-parada, cancelamento) → aí o
+     *            trabalho ativo é morto de vez.
+     */
+    @Volatile private var taskRemoved = false
+
+    /**
+     * Job em andamento (intent completo) para o Service ser recriado pelo
+     * sistema após uma morte por memória e RETOMAR o download de onde parou.
+     */
+    @Volatile private var stickyJob: JobSpec? = null
+
+    /**
+     * v0.22.18: true enquanto o Service está sendo DESTRUÍDO com trabalho
+     * pendente (app fechado dos recentes). O [finally] do download usa esta
+     * flag pra NÃO apagar o job da fila persistida — ele é justamente o que
+     * vai ser relançado pra continuar o download.
+     */
+    @Volatile private var destroyingWithPendingWork = false
+
+    /**
+     * v0.22.18: o job que está RODANDO agora (o primeiro da fila). É o que
+     * tem parciais no disco e o que precisa ser relançado quando o app é
+     * fechado dos recentes — os itens que ainda estão NA FILA só precisam
+     * da fila persistida ([ActiveJobStore]).
+     */
+    @Volatile private var activeSpec: JobSpec? = null
+
     // velocidade do plano B (janela móvel); a do plano A vem da linha do yt-dlp
     private var speedBps = 0L
     private var speedMarkMs = 0L
@@ -122,24 +160,71 @@ class DownloadService : Service() {
                 } else {
                     idleNow(startId)
                 }
+                // v0.22.18: ação de controle não é trabalho em andamento — o
+                // serviço NÃO deve ser recriado pelo STICKY depois dela.
+                return START_NOT_STICKY
             }
-            ACTION_CANCEL -> if (intent != null) {
-                handleCancelIntent(intent, startId)
-            } else {
-                idleNow(startId)
+            ACTION_CANCEL -> {
+                if (intent != null) {
+                    handleCancelIntent(intent, startId)
+                } else {
+                    idleNow(startId)
+                }
+                // ação de controle: o STICKY não deve ressuscitar o serviço
+                // (o download foi cancelado — não há nada para retomar)
+                return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 val paused = DownloadRegistry.paused
                 if (paused == null) {
                     idleNow(startId)
+                    // ação de controle: o STICKY não deve ressuscitar o serviço
+                    return START_NOT_STICKY
                 } else {
-                    enqueue(JobSpec(startId, resumeJobIntent(paused), isResume = true))
+                    // o download retomado É trabalho em andamento: guarda o job
+                    // em disco pra sobreviver a uma morte de processo
+                    val job = JobSpec(startId, resumeJobIntent(paused), isResume = true)
+                    stickyJob = job
+                    ActiveJobStore.save(
+                        applicationContext,
+                        ActiveJobStore.ActiveJob(
+                            url = paused.url,
+                            fileName = paused.fileName,
+                            title = paused.title,
+                            mime = paused.mime,
+                            mode = paused.mode,
+                            bitrate = paused.bitrate,
+                            videoUrl = paused.videoUrl,
+                            engineFormat = paused.engineFormat,
+                            maxHeight = paused.maxHeight
+                        )
+                    )
+                    enqueue(job)
                 }
+                return START_STICKY
             }
             else -> {
                 val i = intent ?: run {
-                    idleNow(startId)
-                    return START_NOT_STICKY
+                    // v0.22.18: Service recriado pelo sistema (START_STICKY) sem
+                    // intent novo → retoma a FILA guardada em disco, continuando
+                    // de onde parou (os parciais no disco são reencontrados pelo
+                    // yt-dlp/Range HTTP).
+                    val saved = ActiveJobStore.loadAll(applicationContext)
+                    if (saved.isEmpty()) {
+                        idleNow(startId)
+                        return START_NOT_STICKY
+                    }
+                    Log.i(TAG, "Service revivido: retomando ${saved.size} download(s) guardado(s)")
+                    saved.forEach { job ->
+                        // v0.22.18: continua dos parciais em disco (o processo
+                        // morreu no meio do download — os .part/.src e o diretório
+                        // estável do yt-dlp estão lá, esperando).
+                        val resumeIntent = Intent(jobToIntent(job)).putExtra(EXTRA_RESUME, true)
+                        val spec = JobSpec(startId, resumeIntent, isResume = true)
+                        stickyJob = spec
+                        enqueue(spec)
+                    }
+                    return START_STICKY
                 }
                 val fileName = i.getStringExtra(EXTRA_FILE)
                 if (fileName.isNullOrBlank() ||
@@ -153,10 +238,35 @@ class DownloadService : Service() {
                 // espelho para a Central de Downloads (não afeta o download)
                 DownloadBus.start(title, fileName)
                 if (busy) DownloadBus.progress(fileName, getString(R.string.dl_queued), 0, true)
-                enqueue(JobSpec(startId, i, isResume = false))
+                // v0.22.18: um intent marcado como retomada continua dos
+                // parciais em disco (o job relançado depois que o app foi
+                // fechado dos recentes, ou o service revivido pelo STICKY).
+                val isResume = i.getBooleanExtra(EXTRA_RESUME, false)
+                val spec = JobSpec(startId, i, isResume)
+                // v0.22.18: guarda o job pra o Service poder ser recriado pelo
+                // sistema (morte por memória / task removida) e continuar o
+                // download em vez de perder o trabalho.
+                stickyJob = spec
+                // ...e em DISCO, porque o processo inteiro pode morrer (aí o
+                // campo em memória vai junto com ele).
+                ActiveJobStore.save(applicationContext, intentToJob(i))
+                enqueue(spec)
             }
         }
-        return START_NOT_STICKY
+        // v0.22.18: START_STICKY — se o Android matar o Service (memória),
+        // ele é recriado e o onStartCommand(NULL) abaixo retoma o job salvo.
+        return START_STICKY
+    }
+
+    /**
+     * v0.22.18: o app foi FECHADO DOS RECENTES (o usuário deslizou a task).
+     * O Android vai destruir o Service logo depois. O download NÃO pode ser
+     * interrompido por isso — só a reprodução de áudio morre com o app.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        taskRemoved = true
+        Log.i(TAG, "Task removida (app fechado dos recentes): download continua")
     }
 
     // ---------- fila (um download de cada vez; a Central mostra a ordem) ----------
@@ -173,18 +283,44 @@ class DownloadService : Service() {
             busy = true
             pending.removeFirst()
         }
+        // v0.22.18: este é o job RODANDO (é o que tem parciais no disco)
+        activeSpec = spec
         scope.launch {
             try {
                 runDownload(spec)
             } finally {
+                // v0.22.18: este job saiu da fila (acabou/falhou/cancelou) →
+                // sai também da fila persistida.
+                //
+                // EXCEÇÃO: quando o SERVICE está sendo destruído com trabalho
+                // pendente (o app foi fechado dos recentes), o job NÃO sai da
+                // fila persistida — ele é o que vai ser RELANÇADO para
+                // continuar o download. Sem esta guarda, o cancelamento do
+                // scope disparava este finally e apagava o registro antes do
+                // relançamento (o download morreria de vez).
+                val destroying = destroyingWithPendingWork
+                if (!destroying) {
+                    val fileName = spec.intent.getStringExtra(EXTRA_FILE)
+                    if (fileName != null) ActiveJobStore.remove(applicationContext, fileName)
+                }
+                // v0.22.18: este job parou de rodar (acabou/falhou/cancelou)
+                activeSpec = null
                 val drained = synchronized(stateLock) {
                     busy = false
                     pending.isEmpty()
                 }
                 if (drained) {
-                    // fila vazia: remove o foreground (fim/falha/pausa já saiu em NOTIF_ID+1)
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf(spec.startId)
+                    if (!destroying) {
+                        // v0.22.18: fila vazia = nenhum trabalho pendente → o
+                        // job guardado é descartado (se o Service for recriado
+                        // depois, não tentaria retomar um download já CONCLUÍDO).
+                        stickyJob = null
+                        ActiveJobStore.clear(applicationContext)
+                        // fila vazia: remove o foreground (fim/falha/pausa já
+                        // saiu em NOTIF_ID+1)
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf(spec.startId)
+                    }
                 } else {
                     pump()
                 }
@@ -260,7 +396,43 @@ class DownloadService : Service() {
             p.videoUrl?.let { putExtra(EXTRA_VIDEO_URL, it) }
             p.engineFormat?.let { putExtra(EXTRA_FORMAT, it) }
             if (p.maxHeight > 0) putExtra(EXTRA_MAX_HEIGHT, p.maxHeight)
+            // v0.22.18: retomada — os parciais em disco são preservados e o
+            // download continua de onde parou (o yt-dlp NÃO limpa o diretório).
+            putExtra(EXTRA_RESUME, true)
         }
+
+    /**
+     * v0.22.18: monta o intent de um job persistido em disco — o MESMO pedido
+     * que originou o download, pra relançá-lo do zero se preciso.
+     */
+    private fun jobToIntent(job: ActiveJobStore.ActiveJob): Intent =
+        Intent(this, DownloadService::class.java).apply {
+            putExtra(EXTRA_URL, job.url)
+            putExtra(EXTRA_FILE, job.fileName)
+            putExtra(EXTRA_TITLE, job.title)
+            putExtra(EXTRA_MIME, job.mime)
+            putExtra(EXTRA_MODE, job.mode)
+            putExtra(EXTRA_BITRATE, job.bitrate)
+            job.videoUrl?.let { putExtra(EXTRA_VIDEO_URL, it) }
+            job.engineFormat?.let { putExtra(EXTRA_FORMAT, it) }
+            if (job.maxHeight > 0) putExtra(EXTRA_MAX_HEIGHT, job.maxHeight)
+        }
+
+    /** Converte o intent de um job em um registro persistível. */
+    private fun intentToJob(i: Intent): ActiveJobStore.ActiveJob {
+        val fileName = i.getStringExtra(EXTRA_FILE) ?: "audio.m4a"
+        return ActiveJobStore.ActiveJob(
+            url = i.getStringExtra(EXTRA_URL),
+            fileName = fileName,
+            title = i.getStringExtra(EXTRA_TITLE) ?: fileName,
+            mime = i.getStringExtra(EXTRA_MIME) ?: "audio/mp4",
+            mode = i.getStringExtra(EXTRA_MODE) ?: MODE_DIRECT,
+            bitrate = i.getIntExtra(EXTRA_BITRATE, 320),
+            videoUrl = i.getStringExtra(EXTRA_VIDEO_URL),
+            engineFormat = i.getStringExtra(EXTRA_FORMAT),
+            maxHeight = i.getIntExtra(EXTRA_MAX_HEIGHT, 0)
+        )
+    }
 
     // ---------- o download em si (um JobSpec por vez) ----------
 
@@ -418,7 +590,13 @@ class DownloadService : Service() {
             Log.e(TAG, "Download falhou: $fileName", e)
             notifyFailed(fileName, e)
         } finally {
-            if (!keepPartials) {
+            // v0.22.18: quando o Service está sendo destruído com trabalho
+            // pendente (app fechado dos recentes), os parciais PRECISAM ficar
+            // no disco — o job relançado continua deles. A checagem é feita
+            // pela flag dedicada (não por [keepPartials], que o próprio
+            // finally zera logo abaixo).
+            val preserve = keepPartials || destroyingWithPendingWork
+            if (!preserve) {
                 tmpSource?.delete()
                 tmpOut?.delete()
                 tmpPart?.delete()
@@ -542,8 +720,13 @@ class DownloadService : Service() {
             return saved to qualityNote
         } finally {
             // pausa preserva os parciais no dir estável para a retomada continuar;
-            // término, falha e cancelamento limpam
-            if (!pauseRequested) outDir.deleteRecursively()
+            // término, falha e cancelamento limpam.
+            //
+            // v0.22.18: o app fechado dos recentes (task removida) TAMBÉM
+            // preserva — o download vai ser relançado e precisa reencontrar
+            // os parciais do yt-dlp pra continuar de onde parou. Sem isto, os
+            // parciais eram apagados e o download reiniciava do zero.
+            if (!pauseRequested && !destroyingWithPendingWork) outDir.deleteRecursively()
         }
     }
 
@@ -551,6 +734,69 @@ class DownloadService : Service() {
         name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "audio" }
 
     override fun onDestroy() {
+        // v0.22.18: o download NÃO pode morrer quando o app é fechado dos
+        // recentes (o usuário desliza a task) nem quando o app fica em segundo
+        // plano. O Android sinaliza a remoção da task por [onTaskRemoved] e
+        // depois destrói o Service; sem este cuidado, o onDestroy cancelava o
+        // scope e matava o python/OkHttp DEIXANDO o download pelo caminho
+        // (o sintoma era "fechei o app e a música parou de baixar").
+        //
+        // O que este bloco faz:
+        //  - com trabalho PENDENTE: preserva os parciais e RELAÇA o job. O
+        //    trabalho que estava rodando NESTE Service é interrompido (o
+        //    Service está morrendo — deixar ele vivo criaria DOIS downloads
+        //    do mesmo arquivo); o job relançado reencontra os parciais no
+        //    disco e continua de onde parou.
+        //  - sem trabalho pendente: encerra o escopo normalmente.
+        val hasPending = synchronized(stateLock) { busy || pending.isNotEmpty() }
+        // taskRemoved = o app foi fechado dos recentes → o download DEVE
+        // continuar: o job é relançado e o STICKY/ActiveJobStore garantem a
+        // retomada mesmo se o processo inteiro morrer logo depois.
+        //
+        // taskRemoved = false e tem trabalho pendente = morte abrupta (forçar-
+        // parada): o trabalho ativo é morto, mas os parciais ficam no disco
+        // (o botão Continuar da Central consegue retomar).
+        if (hasPending && !cancelRequested) {
+            // preserva os parciais (.part/.src e o diretório estável do yt-dlp)
+            // para a retomada continuar de onde parou
+            keepPartials = true
+            // a flag vai ANTES do cancelamento: o finally do download lê ela
+            // pra não apagar o job que será relançado
+            destroyingWithPendingWork = true
+            if (taskRemoved) {
+                Log.i(TAG, "App fechado dos recentes com download em andamento: o download continua")
+            } else {
+                Log.i(TAG, "Service destruído com download em andamento: preservando os parciais")
+            }
+            // PARA o trabalho deste Service (ele está morrendo — se ele
+            // continuasse, teríamos dois downloads do mesmo arquivo). Os
+            // parciais no disco ficam intactos: o job relançado continua deles.
+            scope.cancel()
+            killActive()
+            // relança o MESMO job — o Service novo pega o download de volta.
+            // Prioridade: o job que estava RODANDO (tem parciais no disco) →
+            // o último pedido → a fila persistida (se o processo morreu).
+            val relaunch = activeSpec?.intent
+                ?: stickyJob?.intent
+                ?: ActiveJobStore.load(applicationContext)?.let { jobToIntent(it) }
+            if (relaunch != null && taskRemoved) {
+                try {
+                    // v0.22.18: marca como RETOMADA — o download relançado
+                    // continua dos parciais em disco (não recomeça do zero).
+                    val resumeIntent = Intent(relaunch).putExtra(EXTRA_RESUME, true)
+                    if (Build.VERSION.SDK_INT >= 26) {
+                        ContextCompat.startForegroundService(applicationContext, resumeIntent)
+                    } else {
+                        applicationContext.startService(resumeIntent)
+                    }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "não consegui relançar o download", t)
+                }
+            }
+            super.onDestroy()
+            return
+        }
+
         scope.cancel()
         // serviço destruído com download rodando (ex.: app forçado a parar):
         // mata o python/OkHttp para não deixar processo órfão comendo rede
@@ -1066,6 +1312,14 @@ class DownloadService : Service() {
         const val EXTRA_VIDEO_URL = "video_url"
         const val EXTRA_FORMAT = "engine_format"
         const val EXTRA_MAX_HEIGHT = "engine_max_height"
+
+        /**
+         * v0.22.18: marca o intent como RETOMADA. O job relançado depois que
+         * o app foi fechado dos recentes (ou o service revivido pelo STICKY)
+         * tem que continuar dos parciais em disco — sem esta flag, o motor do
+         * yt-dlp limparia o diretório e o download recomeçaria do zero.
+         */
+        const val EXTRA_RESUME = "resume_from_partials"
 
         /** Tentativas de download (a primeira + 2 retomadas). */
         private const val MAX_ATTEMPTS = 3
