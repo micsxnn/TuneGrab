@@ -10,7 +10,7 @@
     <string name="splash_name">Micael San</string>
 
     <!-- Letreiro led do Início (v0.16.0) -->
-    <string name="home_led">♪ TuneGrab ♪</string>
+    <string name="home_led">TuneGrab</string>
 
     <string name="hint_url">Cole o link do YouTube aqui</string>
     <string name="btn_download">Baixar</string>
@@ -28,7 +28,7 @@
     <string name="status_fetching">Buscando informações…</string>
     <string name="status_checking">Testando os links de download…</string>
     <string name="status_opening_player">Abrindo o player…</string>
-    <string name="status_pick_format">Escolha o formato e a qualidade 👇</string>
+    <string name="status_pick_format">Escolha o formato e a qualidade</string>
     <string name="status_rescue">O YouTube bloqueou a extração normal — usando o motor de resgate (yt-dlp)…</string>
     <string name="status_downloading">Baixando… acompanhe na Central de Downloads. O arquivo é salvo em Downloads/TuneGrab.</string>
     <string name="status_converting">Baixando e convertendo para MP3 %1$s… acompanhe na Central de Downloads.</string>
@@ -54,7 +54,7 @@
     <string name="err_bot_check_reason">O YouTube bloqueou o acesso anônimo e a renovação do token interno falhou (%1$s). Aguarde um pouco e toque em Baixar de novo.</string>
     <string name="err_blocked_403">O YouTube bloqueou este stream agora. Tente baixar novamente em alguns minutos.</string>
     <string name="err_streams_blocked">O YouTube bloqueou os arquivos deste vídeo agora mesmo. O TuneGrab já renovou a sessão automaticamente — toque em Baixar de novo em alguns segundos.</string>
-    <string name="err_bot_check_dlp">O YouTube bloqueou TAMBÉM o motor de resgate neste vídeo — é bloqueio temporário da sua rede/IP. Troque de rede (Wi-Fi ↔ 4G/5G), espere alguns minutos e tente de novo.</string>
+    <string name="err_bot_check_dlp">O YouTube bloqueou TAMBÉM o motor de resgate neste vídeo — é bloqueio temporário da sua rede/IP. Troque de rede (de Wi-Fi para 4G/5G, ou o contrário), espere alguns minutos e tente de novo.</string>
     <string name="err_no_stream_play">Não achei nenhuma faixa reproduzível nesse vídeo :( Tenta tocar de novo ou baixa direto.</string>
 
     <!-- Playlist (v0.13.0) -->
@@ -69,7 +69,7 @@
     <string name="pl_close">Fechar</string>
     <string name="pl_preparing_zero">Preparando a fila…</string>
     <string name="pl_preparing">Preparando %1$d de %2$d… %3$s</string>
-    <string name="pl_done_all">Playlist na fila! 🎉 %1$d vídeos entraram</string>
+    <string name="pl_done_all">Playlist na fila! %1$d vídeos entraram</string>
     <string name="pl_done_partial">Fila pronta: %1$d entraram · %2$d falharam</string>
     <string name="pl_done_none">Nada entrou na fila :( — o YouTube travou tudo. Espera 1 minutinho e tenta de novo</string>
     <string name="pl_play_error">Reproduzir é só pra vídeo único — playlist usa o botão Baixar</string>
@@ -89,7 +89,7 @@
     <string name="crash_subtitle">Copie o relatório abaixo e envie para o desenvolvedor — isso ajuda muito a corrigir o problema.</string>
     <string name="crash_subtitle_error">Toque em \"Copiar erro\" e envie para o desenvolvedor — com isso o problema fica muito mais fácil de corrigir.</string>
     <string name="crash_copy">Copiar erro</string>
-    <string name="crash_copied">Erro copiado ✔</string>
+    <string name="crash_copied">Erro copiado</string>
 
     <string name="notif_channel_name">Downloads</string>
     <string name="notif_channel_desc">Progresso dos downloads de áudio</string>
@@ -168,7 +168,7 @@
     <string name="dl_metered_msg">Você não está no Wi-Fi. Esse download vai gastar dados móveis.</string>
     <string name="dl_metered_yes">Baixar assim mesmo</string>
     <string name="set_row_account">Conta do YouTube</string>
-    <string name="set_sub_account_on">Conectada ✓ — os downloads usam a sua sessão (menos anti-bot)</string>
+    <string name="set_sub_account_on">Conectada — os downloads usam a sua sessão (menos anti-bot)</string>
     <string name="set_sub_account_off">Não conectada — toque pra entrar pela aba YouTube</string>
     <string name="set_sub_update">Toque pra verificar se saiu versão nova</string>
     <string name="acc_toast_on">Conta do YouTube conectada! Os downloads agora usam a sua sessão.</string>
@@ -230,7 +230,7 @@
     <!-- Central de downloads -->
     <string name="dl_title">Central de downloads</string>
     <string name="dl_empty_title">Nenhum download ainda :(</string>
-    <string name="dl_empty_sub">Os downloads aparecem aqui. Cole um link no Início e baixe sua primeira música 🎵</string>
+    <string name="dl_empty_sub">Os downloads aparecem aqui. Cole um link no Início e baixe sua primeira música</string>
     <string name="dl_empty_cta">Baixar primeira música</string>
     <string name="dl_empty_filter_title">Nada neste filtro</string>
     <string name="dl_empty_filter_sub">Troca o filtro aí em cima pra ver os outros downloads.</string>
@@ -243,15 +243,15 @@
     <string name="dl_clear_title">Limpar a lista de downloads?</string>
     <string name="dl_clear_msg">Os downloads concluídos, com falha ou cancelados saem da lista. Nenhum arquivo é apagado — eles continuam salvos no aparelho. Pra excluir de verdade, use a lixeira no card ou na Biblioteca.</string>
     <string name="dl_clear_yes">Limpar</string>
-    <string name="dl_clear_done_list">Lista limpa ✓ — os arquivos continuam salvos</string>
+    <string name="dl_clear_done_list">Lista limpa — os arquivos continuam salvos</string>
     <string name="lib_delete">Apagar mídia</string>
     <string name="dl_preparing">Preparando…</string>
     <string name="dl_running_pct">%1$d%%</string>
     <string name="dl_running_pct_speed">%1$d%% · %2$s</string>
-    <string name="dl_state_done">Concluído ✓</string>
+    <string name="dl_state_done">Concluído</string>
     <string name="dl_state_failed">Falhou</string>
     <string name="dl_state_failed_reason">Falhou — %1$s</string>
-    <string name="dl_error_copied">Detalhes do erro copiados ✓</string>
+    <string name="dl_error_copied">Detalhes do erro copiados</string>
     <string name="cd_copy">Copiar detalhes do erro</string>
     <string name="dl_state_paused">Pausado</string>
     <string name="dl_state_cancelled">Cancelado</string>
@@ -271,7 +271,7 @@
     <string name="lib_meta_line">%1$s · %2$s</string>
     <string name="lib_err_open">Não foi possível abrir este arquivo.</string>
     <string name="lib_err_delete">Não foi possível apagar este arquivo.</string>
-    <string name="lib_deleted">Apagado ✓</string>
+    <string name="lib_deleted">Apagado</string>
 
     <!-- Verificação dupla antes de apagar (v0.10.8) -->
     <string name="lib_delete_title">Apagar arquivo?</string>
@@ -297,8 +297,8 @@
     </plurals>
     <string name="lib_sel_delete_msg">Os arquivos selecionados serão apagados definitivamente. Essa ação não pode ser desfeita.</string>
     <plurals name="lib_sel_deleted">
-        <item quantity="one">%1$d arquivo apagado ✓</item>
-        <item quantity="other">%1$d arquivos apagados ✓</item>
+        <item quantity="one">%1$d arquivo apagado</item>
+        <item quantity="other">%1$d arquivos apagados</item>
     </plurals>
     <string name="lib_sel_partial">Apaguei %1$d de %2$d — os que restaram são de outros apps e pedem confirmação própria (apague um por um)</string>
     <string name="cd_refresh">Atualizar</string>
@@ -319,7 +319,7 @@
     <string name="lib_new_folder_msg">A pasta nasce DE VERDADE dentro da pasta do TuneGrab — aparece no gerenciador de arquivos do aparelho também.</string>
     <string name="lib_new_folder_hint">Nome da pasta</string>
     <string name="lib_new_folder_ok">Criar</string>
-    <string name="lib_folder_created">Pasta criada ✓</string>
+    <string name="lib_folder_created">Pasta criada</string>
     <string name="lib_err_folder_name">Escreve um nome pra pasta (sem “/”)</string>
     <!-- v0.22.4: pasta de nome em branco (criada fora do app) ganha rótulo -->
     <string name="lib_folder_blank">(pasta sem nome)</string>
@@ -339,14 +339,14 @@
     <string name="lib_folder_opt_delete">Apagar pasta</string>
     <string name="lib_folder_rename_title">Renomear pasta</string>
     <string name="lib_folder_rename_ok">Renomear</string>
-    <string name="lib_folder_renamed">Pasta renomeada ✓</string>
+    <string name="lib_folder_renamed">Pasta renomeada</string>
     <string name="lib_err_folder_rename">Não foi possível renomear a pasta.</string>
     <!-- v0.22.6: mover pasta de lugar -->
-    <string name="lib_folder_moved">Pasta movida ✓</string>
+    <string name="lib_folder_moved">Pasta movida</string>
     <string name="lib_err_folder_move">Não foi possível mover a pasta.</string>
     <string name="lib_folder_delete_title">Apagar pasta</string>
     <string name="lib_folder_delete_empty">Apagar a pasta “%1$s” vazia?</string>
-    <string name="lib_folder_deleted">Pasta apagada ✓</string>
+    <string name="lib_folder_deleted">Pasta apagada</string>
     <string name="lib_err_folder_delete">Não foi possível apagar a pasta.</string>
     <plurals name="lib_folder_delete_items">
         <item quantity="one">Apagar “%1$s” e o %2$d item que mora dentro dela?\nSubpastas e tudo que tem nelas vai junto.</item>
@@ -363,8 +363,8 @@
     <string name="lib_move_here">Mover aqui</string>
     <string name="lib_move_blocked">Não dá pra mover a pasta pra dentro dela mesma</string>
     <string name="lib_move_none">O que você marcou não é do TuneGrab — só o que o app baixou pode ser movido</string>
-    <string name="lib_moved_one">Movido ✓</string>
-    <string name="lib_moved_many">%1$d movidos ✓</string>
+    <string name="lib_moved_one">Movido</string>
+    <string name="lib_moved_many">%1$d movidos</string>
     <string name="lib_move_partial">Movei %1$d de %2$d — o resto não pôde ser movido</string>
     <string name="lib_move_same">Já está nessa pasta</string>
     <string name="lib_err_move">Não foi possível mover — pode já existir arquivo com o mesmo nome no destino.</string>
@@ -385,7 +385,7 @@
     <string name="player_next">Próxima faixa</string>
     <string name="player_close">Fechar</string>
     <string name="player_err">Não foi possível reproduzir este arquivo.</string>
-    <string name="player_err_stream">Não deu pra tocar esse vídeo. Tenta de novo em instantes 🙏</string>
+    <string name="player_err_stream">Não deu pra tocar esse vídeo. Tenta de novo em instantes</string>
     <string name="player_buffering">Carregando…</string>
     <string name="player_fullscreen">Tela cheia</string>
     <string name="player_exit_fullscreen">Sair da tela cheia</string>
@@ -426,7 +426,7 @@
 
     <!-- Atualização (Fase 2: baixar e instalar dentro do app) -->
     <string name="upd_downloading">Baixando… %1$d%%</string>
-    <string name="upd_ready_toast">Atualização baixada! Toque no aviso pra instalar ✓</string>
+    <string name="upd_ready_toast">Atualização baixada! Toque no aviso pra instalar</string>
     <string name="upd_err_download">Falha ao baixar a atualização. Tenta de novo.</string>
     <string name="upd_err_install">Não foi possível iniciar a instalação.</string>
     <string name="upd_need_permission">Autorize o TuneGrab a instalar apps (Ajustes) e toque em Instalar de novo.</string>
@@ -438,7 +438,7 @@
          Bem-vindo · Cole o link · Aba YouTube · Central · Biblioteca -->
     <string name="onb_skip">Pular</string>
     <string name="onb_next">Próximo</string>
-    <string name="onb_start">Começar a usar ♪</string>
+    <string name="onb_start">Começar a usar</string>
     <string name="onb1_title">Bem-vindo ao TuneGrab!</string>
     <string name="onb1_body">Este é o seu baixador de músicas e vídeos do YouTube: rápido, sem anúncios e salvando tudo direto no aparelho. Siga este tour — ele te mostra o caminho completo em 5 passos.</string>
     <string name="onb2_title">Cole o link e escolha</string>
@@ -477,8 +477,8 @@ O switch que existe no player de música é outro caso: ele muda só a reproduç
          internet. Errou, tenta de novo na hora — sem punição. -->
     <string name="lock_sub">Este app é por convite. Digite a senha que você recebeu pra liberar o uso — cada senha fica presa em um único aparelho.</string>
     <string name="lock_hint">Senha</string>
-    <string name="lock_btn">Liberar o app ♪</string>
-    <string name="lock_ok">Senha aceita ✓ liberando o app…</string>
+    <string name="lock_btn">Liberar o app</string>
+    <string name="lock_ok">Senha aceita, liberando o app…</string>
     <string name="lock_err_empty">Digite a senha que você recebeu.</string>
     <string name="lock_err_wrong">Senha não reconhecida — pode ter vindo com erro de digitação ou ter sido trocada. Confere aí e tenta de novo.</string>
     <string name="lock_err_wrong_device">Essa senha existe, mas pertence a OUTRO aparelho — cada senha fica presa no celular de quem pediu. Confere se este é o aparelho certo.</string>
@@ -488,5 +488,5 @@ O switch que existe no player de música é outro caso: ele muda só a reproduç
     <string name="lock_footer">Não tem senha? Manda seu nome completo e o código deste aparelho pro Micael.</string>
     <string name="lock_device_label">Código deste aparelho</string>
     <string name="lock_device_copy_hint">toque pra copiar</string>
-    <string name="lock_device_copied">Código copiado ✓ manda ele junto com o seu nome pro Micael</string>
+    <string name="lock_device_copied">Código copiado, manda ele junto com o seu nome pro Micael</string>
 </resources>

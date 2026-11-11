@@ -15,7 +15,7 @@ import androidx.appcompat.widget.AppCompatTextView
  * bitmap, nenhuma view extra, roda em qualquer API >= 21.
  *
  * Usado na assinatura da SplashActivity ("feito por micaelsan") e no nome do
- * app no header do Início ("♪ TuneGrab ♪", v0.16.1 — troca o letreiro rolante
+ * app no header do Início ("TuneGrab", v0.16.1 — troca o letreiro rolante
  * que piscava: aqui o texto fica PARADO, só a luz varre).
  */
 class LedTextView @JvmOverloads constructor(
