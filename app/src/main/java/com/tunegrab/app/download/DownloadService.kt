@@ -237,6 +237,10 @@ class DownloadService : Service() {
                 val title = i.getStringExtra(EXTRA_TITLE) ?: fileName
                 // espelho para a Central de Downloads (não afeta o download)
                 DownloadBus.start(title, fileName)
+                // v0.22.21: item NA FILA entra como "na fila" (percent 0, barra
+                // indeterminada). Mas se o item JÁ estava rodando (relançamento
+                // do mesmo job), o DownloadBus preserva o percentual — e aqui
+                // o maxOf do progress mantém o valor maior.
                 if (busy) DownloadBus.progress(fileName, getString(R.string.dl_queued), 0, true)
                 // v0.22.18: um intent marcado como retomada continua dos
                 // parciais em disco (o job relançado depois que o app foi
@@ -452,11 +456,18 @@ class DownloadService : Service() {
         DownloadBus.setActive(fileName)
         DownloadRegistry.clearIf(fileName)
         DownloadBus.start(title, fileName)
+        // v0.22.21: na RETOMADA, o card NÃO volta pra 0% — o download
+        // continua de onde parou (os parciais no disco são reencontrados),
+        // então mostrar "0%, preparando" seria mentira na tela. O espelho
+        // (DownloadBus) preserva o percentual que já estava no card; aqui a
+        // fase muda pra "retomando" e o percentual sobe só com o que o motor
+        // realmente deliverou.
+        val resuming = spec.isResume
         DownloadBus.progress(
             fileName,
-            if (spec.isResume) getString(R.string.dl_resuming) else getString(R.string.dl_preparing),
+            if (resuming) getString(R.string.dl_resuming) else getString(R.string.dl_preparing),
             0,
-            true
+            !resuming
         )
         notificationProgress(fileName, 0, indeterminate = true).let { n ->
             lastProgressNotif = n

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
+import com.tunegrab.app.download.DownloadBus
 import com.tunegrab.app.update.UpdateInstaller
 import com.tunegrab.app.yt.YtDlpEngine
 import com.tunegrab.app.yt.potoken.PoTokenManager
@@ -28,6 +29,10 @@ class TuneGrabApp : Application() {
         // da pasta dedicada (a versão que abriu AGORA já foi instalada —
         // nenhum APK serve mais pra nada)
         onNewVersionCleanup()
+        // v0.22.21: o espelho da Central de Downloads é repovoado do disco —
+        // se o Android matou o processo enquanto um download rodava, o card
+        // renasce no percentual em que parou (e não em 0%).
+        DownloadBus.attach(this)
         // contexto do gerador de PoTokens (BotGuard via WebView)
         PoTokenManager.init(this)
         // contexto dos cookies de login do YouTube (o motor yt-dlp não recebe

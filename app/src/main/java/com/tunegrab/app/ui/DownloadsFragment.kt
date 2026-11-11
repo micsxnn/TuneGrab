@@ -18,6 +18,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -284,9 +285,41 @@ class DownloadsAdapter : RecyclerView.Adapter<DownloadsAdapter.VH>() {
     var onCancel: ((DownloadBus.Item) -> Unit)? = null
     var onDelete: ((DownloadBus.Item) -> Unit)? = null
 
+    /**
+     * v0.22.21: atualiza a lista com DiffUtil.
+     *
+     * Antes era [notifyDataSetChanged] — que recria TODAS as views do card a
+     * cada batida de progresso. O efeito visível era o card "piscando"/voltando
+     * ao estado anterior enquanto baixava (e, junto, a rolagem da lista
+     * saltando). Com DiffUtil, só o que MUDOU é redesenhado — o card do
+     * download que continua rodando não se mexe.
+     */
     fun submit(list: List<DownloadBus.Item>) {
+        val old = items
+        if (old == list) return
         items = list
-        notifyDataSetChanged()
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = old.size
+            override fun getNewListSize(): Int = list.size
+            override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean =
+                old[oldPos].fileName == list[newPos].fileName
+
+            // v0.22.21: o updatedAt é metadado interno (o "momento da
+            // última mudança") e NÃO aparece na tela — comparar sem ele evita
+            // redesenhar o card quando nada visível mudou.
+            override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                val a = old[oldPos]
+                val b = list[newPos]
+                return a.fileName == b.fileName &&
+                    a.title == b.title &&
+                    a.phase == b.phase &&
+                    a.percent == b.percent &&
+                    a.indeterminate == b.indeterminate &&
+                    a.state == b.state &&
+                    a.detail == b.detail &&
+                    a.speed == b.speed
+            }
+        }).dispatchUpdatesTo(this)
     }
 
     class VH(val binding: ItemDownloadBinding) : RecyclerView.ViewHolder(binding.root)

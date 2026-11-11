@@ -1,16 +1,15 @@
-O player de vídeo ficou bom de usar.
+O card do download não resets mais quando você troca de aba.
 
-Antes, os controles ficavam espremidos embaixo do vídeo e você tinha que
-acertar bem o meio da tela pra pausar, passar pra frente ou voltar. Agora o
-botão grande de play fica no centro, com os botões de pular 10 segundos dos
-dois lados. É só encostar.
+Antes, se você saía da Central de Downloads pra outra seção e voltava, o
+card do que estava baixando voltava pra zero, como se o download tivesse
+começado de novo. Agora ele continua exatamente onde estava, mostrando a
+porcentagem e a velocidade certaininhas.
 
-A barra de progresso também mudou: agora é fina, dourada, e mostra o tempo
-que passou e o tempo total embaixo, igual à do player de música.
+O mesmo vale pro app inteiro: se o Android fechar o app pra liberar memória
+no meio de um download, o download continua (isso já foi arrumado antes) e,
+quando você abre o app de novo, o card já aparece no ponto em que parou, em
+vez de sumir ou mostrar zero.
 
-O outro detalhe bom é que os controles somem sozinhos depois de alguns
-segundos, deixando o vídeo limpo pra assistir. Um toque na tela traz eles de
-volta.
-
-Vale pros dois tipos de vídeo: o que você baixou e o que toca direto da
-rede.
+De quebra, o card não fica mais piscando ou pulando enquanto baixa: agora
+só o que muda de verdade é redesenhado na tela, então o progresso anda
+tranquilo.
