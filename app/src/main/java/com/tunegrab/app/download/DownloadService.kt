@@ -248,11 +248,11 @@ class DownloadService : Service() {
                 val title = i.getStringExtra(EXTRA_TITLE) ?: fileName
                 // espelho para a Central de Downloads (não afeta o download)
                 DownloadBus.start(title, fileName)
-                // v0.22.21: item NA FILA entra como "na fila" (percent 0, barra
+                // v0.22.24: item NA FILA entra como "na fila" (percent 0, barra
                 // indeterminada). Mas se o item JÁ estava rodando (relançamento
-                // do mesmo job), o DownloadBus preserva o percentual — e aqui
-                // o maxOf do progress mantém o valor maior.
-                if (busy) DownloadBus.progress(fileName, getString(R.string.dl_queued), 0, true)
+                // do mesmo job), o espelho preserva o percentual, a fase e a
+                // barra — o card não volta pro estado de espera.
+                if (busy) DownloadBus.queued(fileName, getString(R.string.dl_queued))
                 // v0.22.18: um intent marcado como retomada continua dos
                 // parciais em disco (o job relançado depois que o app foi
                 // fechado dos recentes, ou o service revivido pelo STICKY).
@@ -470,15 +470,14 @@ class DownloadService : Service() {
         // v0.22.21: na RETOMADA, o card NÃO volta pra 0% — o download
         // continua de onde parou (os parciais no disco são reencontrados),
         // então mostrar "0%, preparando" seria mentira na tela. O espelho
-        // (DownloadBus) preserva o percentual que já estava no card; aqui a
-        // fase muda pra "retomando" e o percentual sobe só com o que o motor
-        // realmente deliverou.
-        val resuming = spec.isResume
-        DownloadBus.progress(
+        // (DownloadBus) preserva o percentual que já estava no card.
+        //
+        // v0.22.24: o método starting() do espelho decide a barra: se o card
+        // já tinha progresso (percent > 0), a barra NÃO volta a ser
+        // indeterminada (sumia o número e voltava a parecer "preparando").
+        DownloadBus.starting(
             fileName,
-            if (resuming) getString(R.string.dl_resuming) else getString(R.string.dl_preparing),
-            0,
-            !resuming
+            if (spec.isResume) getString(R.string.dl_resuming) else getString(R.string.dl_preparing)
         )
         notificationProgress(fileName, 0, indeterminate = true).let { n ->
             lastProgressNotif = n

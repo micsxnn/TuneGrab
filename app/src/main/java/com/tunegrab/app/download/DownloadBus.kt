@@ -179,6 +179,9 @@ object DownloadBus {
      * Não rebaixa o percentual: um `progress` com percent menor que o atual
      * (atraso de notificação, service relançado que reconta do zero) NÃO
      * pode apagar o avanço que o card já mostra.
+     *
+     * v0.22.24: o mesmo atraso não pode trocar a FASE nem a barra: quando o
+     * percent chega MENOR, o card inteiro é preservado (só o log registra).
      */
     @Synchronized
     fun progress(
@@ -201,12 +204,58 @@ object DownloadBus {
             )
         }
         mutate(fileName) {
-            it.copy(
-                phase = phase,
-                percent = maxOf(it.percent, percent),
-                indeterminate = indeterminate,
-                speed = speed
-            )
+            if (percent < it.percent) {
+                // progresso atrasado: preserva o card INTEIRO (fase, barra,
+                // velocidade e percentual) — senão o card mostrava
+                // "Baixando · 99%" (a fase atrasada com o percentual novo)
+                it
+            } else {
+                it.copy(
+                    phase = phase,
+                    percent = percent,
+                    indeterminate = indeterminate,
+                    speed = speed
+                )
+            }
+        }
+    }
+
+    /**
+     * v0.22.24: o download (re)começou a rodar — fase "preparando" ou
+     * "retomando".
+     *
+     * Se o item JÁ TINHA progresso (percent > 0), a barra NÃO volta a ficar
+     * indeterminada e a fase anterior é preservada: o card não pode
+     * "voltar pra preparando" quando o download na verdade já está a 40%.
+     * A fase nova (preparando/retomando) entra no texto, mas a barra segue
+     * mostrando o percentual real.
+     */
+    @Synchronized
+    fun starting(fileName: String, phase: String) {
+        mutate(fileName) {
+            if (it.percent > 0) {
+                it.copy(phase = phase, indeterminate = false)
+            } else {
+                it.copy(phase = phase, indeterminate = true)
+            }
+        }
+    }
+
+    /**
+     * v0.22.24: o item entrou na FILA (outro download está rodando).
+     *
+     * Se ele JÁ tinha progresso (é o mesmo job relançado), a fase e a barra
+     * não voltam pra "na fila" — o card mantém onde estava. Só o item
+     * realmente novo entra como "na fila" com barra indeterminada.
+     */
+    @Synchronized
+    fun queued(fileName: String, phase: String) {
+        mutate(fileName) {
+            if (it.percent > 0) {
+                it
+            } else {
+                it.copy(phase = phase, indeterminate = true)
+            }
         }
     }
 
@@ -263,7 +312,9 @@ object DownloadBus {
         _items.value = _items.value.filter {
             it.state == State.RUNNING || it.state == State.PAUSED
         }
-        persist()
+        // v0.22.24: força a gravação — se o processo morrer logo depois, o
+        // espelho em disco não pode trazer os concluídos de volta.
+        persist(force = true)
     }
 
     /**
@@ -274,7 +325,8 @@ object DownloadBus {
     @Synchronized
     fun remove(fileName: String) {
         _items.value = _items.value.filter { it.fileName != fileName }
-        persist()
+        // v0.22.24: força a gravação (o item deletado não pode ressuscitar).
+        persist(force = true)
     }
 
     private fun mutate(fileName: String, transform: (Item) -> Item) {

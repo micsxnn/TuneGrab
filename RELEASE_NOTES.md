@@ -1,22 +1,21 @@
-O aviso de versão nova ficou mais confiável.
+Versão de teste do card do download, de novo — agora com diagnóstico.
 
-Agora, quando você aperta "Atualizar agora" nas Configurações, ele consulta
-de verdade. Antes ele fingia que tinha verificado e devolvia a resposta
-guardada de antes, sem olhar nada.
+Se o card ainda resetar quando você troca de seção, esta versão tem um
+registro que mostra exatamente o que aconteceu, pra eu não ficar
+adivinhando. É só o log do app, nada aparece na tela.
 
-Também consertei o aviso que você dispensou: ele voltava a aparecer sozinho
-depois de um tempo, mesmo sem sair versão nova. Agora só avisa de novo se
-sair outra versão.
+O que também foi arrumado nesta:
 
-O app passou a perguntar as versões novas por um caminho que não tem limite
-de pedidos. Antes ele usava o endereço oficial do GitHub, que bloqueia
-quem pergunta muito de um mesmo endereço de internet (no 4G é o caso de
-muita gente). Era por isso que às vezes o aviso simplesmente não aparecia.
-Se esse caminho falhar, o app tenta o outro, como antes.
+- Quando o download volta a rodar depois de uma pausa ou de o sistema
+  liberar memória, a barrinha não volta mais a ficar animada sem número.
+  Ela continua mostrando a porcentagem real.
+- O item que entra na fila não troca mais o que já estava na tela.
+- Um aviso atrasado do download não embaralha mais o texto do card (ele
+  mostrava "Baixando" junto com "99%").
 
-E, se um dia o nome do arquivo do APK mudar, o app se recupera sozinho:
-ele percebe que o link quebrou, pergunta o endereço certo e continua a
-instalação.
+Se ainda resetar, me manda o log que sai do comando:
 
-Nada disso pesa no seu bolso: o repositório é público, a construção roda em
-máquina do GitHub sem cobrança, e nenhuma consulta a mais foi acrescentada.
+adb logcat -s TuneGrabCard TuneGrabBus TuneGrab
+
+Com ele eu vejo o instante exato em que o card mudou, e de onde veio a
+mudança.
