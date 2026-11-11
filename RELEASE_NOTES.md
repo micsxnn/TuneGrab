@@ -1,17 +1,11 @@
-O player de vídeo ficou com movimento de verdade.
+Ajuste fino no aviso de versão nova.
 
-Antes, tudo aparecia e sumia de uma vez: os controles, o botão de play, o
-círculo de "carregando". Ficava seco, como se o app não quisesse o vídeo.
+Agora, se você está baixando a atualização e sair uma versão ainda mais nova
+enquanto isso, o aviso continua mostrando a que está baixando, com a
+porcentagem certinha. Antes ele trocava de versão no meio da barra e você
+perdia o acompanhamento.
 
-Agora:
-
-- Os controles entram e saem deslizando, com um leve zoom. O vídeo continua
-  ali, você só vê o que precisa na hora.
-- O botão de play gira quando vira pause, e vice-versa. Dá pra ver a troca.
-- Os botões de pular 10 segundos respondem ao toque, com um baque elástico.
-- A barra de progresso desliza em vez de dar saltos, e o tempo é exato.
-- O "carregando" aparece e some de leve, sem piscar.
-- O botão dourado do play ganhou brilho de verdade e sombra, e os números
-  dos botões de pular ficaram mais legíveis.
-
-Vale pros dois vídeos: o baixado e o que toca direto da rede.
+Também tirei o registro de diagnóstico que estava no app: ele foi montado
+para investigar um problema que, no fim, era outro. Os registros que
+interessam de verdade (quando o download é reiniciado, quando um progresso
+chega atrasado) continuam lá, mas só acontecem quando são relevantes.

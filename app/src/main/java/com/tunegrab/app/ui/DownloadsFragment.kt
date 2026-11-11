@@ -8,7 +8,6 @@ import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -33,16 +32,6 @@ import com.tunegrab.app.download.DownloadService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/**
- * Tag do log de diagnóstico da Central de Downloads (v0.22.24).
- *
- * É o log que responde "o card reseta porque o DADO sumiu ou porque a TELA
- * mostra errado?": o render() loga o que o espelho tem, o bind() loga o que
- * está sendo exibido, e o onViewCreated loga o que havia no instante exato
- * em que a aba foi recriada.
- */
-private const val TAG = "TuneGrabCard"
 
 /**
  * Central de Downloads: o que está baixando agora + o que terminou, falhou,
@@ -74,17 +63,6 @@ class DownloadsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // v0.22.24 (DIAGNÓSTICO): o instante EXATO em que a aba é recriada
-        // (trocar de seção = replace() = fragment novo). O log mostra o que
-        // o espelho tinha NESSE MOMENTO — se o percentual já veio zerado
-        // aqui, o DownloadService reiniciou o job; se veio certo, o problema
-        // é na renderização.
-        Log.i(
-            TAG,
-            "aba recriada: bus tem ${DownloadBus.items.value.size} item(s) | " +
-                DownloadBus.items.value.joinToString { "${it.fileName}=${it.percent}%/${it.state}" } +
-                " | ativo=${DownloadBus.activeFileName}"
-        )
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
         // v0.19.15: "Limpar finalizados" só tira os downloads da LISTA (pra
@@ -202,21 +180,6 @@ class DownloadsFragment : Fragment() {
 
     private fun render(items: List<DownloadBus.Item>) {
         val shown = items.filter { matchesFilter(it) }
-        // v0.22.24 (DIAGNÓSTICO): o log separa os TRÊS cenários do bug do
-        // card que reseta ao trocar de aba:
-        //   (1) o DownloadBus JÁ CHEGOU ZERADO aqui  → o problema é a montante
-        //       (o DownloadService reiniciou o job / o espelho não sobreviveu);
-        //   (2) o DownloadBus tem o percentual CERTO e o card mostra errado
-        //       → o problema é na renderização (adapter/layout);
-        //   (3) o DownloadBus tem o percentual CERTO e o card mostra CERTO
-        //       → o card não reseta; o que "falha" é outra coisa (fase,
-        //       barra indeterminada, filtro da aba...).
-        Log.i(
-            TAG,
-            "render: ${items.size} item(s) no bus, ${shown.size} no filtro | " +
-                items.joinToString { "${it.fileName}=${it.percent}%/${it.state}" } +
-                " | ativo=${DownloadBus.activeFileName}"
-        )
         adapter.submit(shown)
         val b = _binding ?: return
         b.emptyState.isVisible = shown.isEmpty()
@@ -370,14 +333,6 @@ class DownloadsAdapter : RecyclerView.Adapter<DownloadsAdapter.VH>() {
         val item = items[position]
         val b = holder.binding
         val ctx = b.root.context
-        // v0.22.24 (DIAGNÓSTICO): o log do que está SENDO EXIBIDO no card.
-        // Comparado com o log do render() (o que o bus tem), dá pra saber na
-        // hora se o card reseta por causa do dado ou da tela.
-        Log.i(
-            TAG,
-            "bind: ${item.fileName}=${item.percent}%/${item.state} fase='${item.phase}' " +
-                "indeterminate=${item.indeterminate} ativo=${DownloadBus.activeFileName}"
-        )
         b.tvName.text = item.title
         // reset do estado RECICLADO: botão de copiar do card "Falhou", a
         // lixeira do card concluído e o limite de linhas da fase não podem

@@ -122,7 +122,16 @@ class HomeFragment : Fragment() {
         }
         viewLifecycleOwner.lifecycleScope.launch {
             val info = UpdateChecker.check(requireContext())
-            if (info != null && _binding != null) showUpdateCard(info)
+            if (info == null || _binding == null) return@launch
+            // v0.22.27: se há um download do APK EM ANDAMENTO, o card continua
+            // mostrando a release que está baixando. Sem esta guarda, uma
+            // versão nova que saísse NO MEIO do download faria o check trocar
+            // o card no meio da barra — o usuário perderia o acompanhamento do
+            // download que estava rodando.
+            val busy = UpdateDownloadState.info
+            val emCurso = busy != null &&
+                (UpdateDownloadState.downloading || UpdateDownloadState.done)
+            showUpdateCard(if (emCurso) busy!! else info)
         }
     }
 
