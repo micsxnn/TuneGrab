@@ -389,6 +389,7 @@ versão oficial.
 - [x] **Player de vídeo bonito: botão grande de play no centro, pular 10 segundos dos dois lados, barra de progresso fina e controles que somem sozinhos** (v0.22.20)
 - [x] **Card do download não reseta mais ao trocar de aba: o progresso é preservado e o espelho da Central sobrevive à morte do processo** (v0.22.21)
 - [x] **Versão de teste do conserto do card do download, publicada como latest pra teste no aparelho** (v0.22.22)
+- [x] **Aviso de versão nova confiável: "Atualizar agora" consulta de verdade, o aviso dispensado não volta sozinho, a consulta usa o caminho sem limite de pedidos do GitHub e se auto-cura se o link do APK mudar** (v0.22.23)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

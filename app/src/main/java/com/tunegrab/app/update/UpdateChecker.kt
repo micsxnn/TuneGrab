@@ -1,6 +1,7 @@
 package com.tunegrab.app.update
 
 import android.content.Context
+import com.tunegrab.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -13,17 +14,16 @@ import java.util.concurrent.TimeUnit
  *
  * Consulta a release "latest" do GitHub (a mesma que o CI publica), compara
  * com a versão instalada e devolve os dados do card do Início. DUAS ROTAS:
- *  - ROTA 1 (API oficial): JSON completo — inclui os ASSETS (link e tamanho
- *    do APK). Vivia com o DONO ANTIGO do repositório (MicaelSanPedro) e
- *    dependia de redirect de conta renomeada — depois da mudança pra
- *    micsxnn o card começou a depender de um redirect frágil (morre se
- *    alguém registrar o nome antigo) e da cota da API;
- *  - ROTA 2 (fallback, feed releases.atom do github.com): SEM rate limit
- *    de API — a API sem login aceita 60 pedidos/hora POR IP, e o 4G
- *    brasileiro é CGNAT (milhares de pessoas no mesmo IP público): chegava
- *    em 403 silencioso e o card nunca nascia. O atom não tem assets, então
- *    o link do APK é montado do padrão do CI (TuneGrab-vX.apk) e o tamanho
- *    fica 0 (desconhecido — o instalador lê o content-length real).
+ *  - ROTA 1 (PRINCIPAL, v0.22.23): feed releases.atom do github.com — é
+ *    servido pelo SITE (CDN), NÃO tem o rate limit de 60 req/hora POR IP da
+ *    API REST. Era o que faltava: a API sem login é limitada por IP e o 4G
+ *    brasileiro é CGNAT (milhares de pessoas no mesmo IP público), então a
+ *    rota da API recebia 403 silencioso e o card NUNCA nascia (foi o bug da
+ *    v0.22.15). O atom não tem limite nenhum;
+ *  - ROTA 2 (RESERVA, v0.22.23): a API oficial do GitHub — só entra em
+ *    campo se o atom falhar, e traz os ASSETS (link e tamanho reais do
+ *    APK), que o atom não tem.
+ *
  * Regras:
  *  - Throttle: rede no máximo 1x a cada 6h; entre consultas, o último
  *    resultado fica em cache e o card reaparece sem custo;
@@ -31,6 +31,20 @@ import java.util.concurrent.TimeUnit
  *  - Qualquer falha (rede, JSON, parse) = null: o card não aparece e a vida
  *    segue — update NUNCA pode atrapalhar o funcionamento do app;
  *  - Zero permissão nova: usa a INTERNET que o app já tem.
+ *
+ * v0.22.23 — correções (todas sem custo: NENHUMA chamada de rede a mais):
+ *  - "Atualizar agora" (Configurações) FORÇA a consulta (pulando o
+ *    throttle) — antes ele devolvia o cache e mentia que tinha verificado;
+ *  - a versão DISPENSADA não volta a avisar só porque o app foi reaberto
+ *    depois do throttle (só uma versão NOVA a ressuscita);
+ *  - o filtro de pré-release do atom foi corrigido: o antigo (\bbeta|\brc…)
+ *    NÃO pegava "rc2", "rc1", "beta1" (o \b exige fronteira de palavra e o
+ *    número colado quebra a fronteira) — ou seja, as pré-releases mais
+ *    comuns passavam e viravam "latest" no app;
+ *  - se o link do APK montado pelo padrão do CI der 404, o app pergunta à
+ *    API o link DE VERDADE e tenta de novo (auto-cura, 1 requisição, só
+ *    nesse caso raro);
+ *  - User-Agent explícito (a API do GitHub exige o header).
  */
 object UpdateChecker {
 
@@ -42,15 +56,20 @@ object UpdateChecker {
         val apkSize: Long = 0L    // tamanho em bytes (0 = desconhecido)
     )
 
-    // ROTA 1: API oficial (JSON completo, com os assets) — DONO NOVO do
-    // repositório, sem redirect de conta renomeada no meio do caminho
-    private const val API = "https://api.github.com/repos/micsxnn/TuneGrab/releases/latest"
-    // ROTA 2: feed de releases do github.com — for a da cota da API
+    // ROTA 1 (PRINCIPAL): feed releases.atom do github.com — sem rate limit
+    // de API (é endpoint de site/CDN), então o card não depende mais da
+    // cota de 60 req/hora por IP.
     private const val ATOM = "https://github.com/micsxnn/TuneGrab/releases.atom"
+    // ROTA 2 (RESERVA): API oficial — só quando o atom falha; traz os assets.
+    private const val API = "https://api.github.com/repos/micsxnn/TuneGrab/releases/latest"
     private const val PREFS = "update_checker"
     private const val KEY_LAST_CHECK = "last_check_ms"
     private const val KEY_CACHE = "cached_update_json"
     private const val KEY_DISMISSED = "dismissed_version"
+
+    // A API do GitHub exige User-Agent (o OkHttp mandaria "okhttp/x", que
+    // funciona, mas um UA próprio identifica o app em diagnóstico).
+    private val USER_AGENT = "TuneGrab-Android/${BuildConfig.VERSION_NAME}"
 
     // Abertura fria do app SEMPRE consulta (gap mínimo de 10 min contra loop
     // de force-kill); no mesmo processo, no máximo 1x por hora. Nada de
@@ -67,8 +86,14 @@ object UpdateChecker {
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    /** Chamado na abertura da Central (corrotina — rede no IO). */
-    suspend fun check(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+    /**
+     * Consulta a release mais recente.
+     *
+     * [force] = true (botão "Atualizar agora" das Configurações): pula o
+     * throttle e consulta AGORA. Antes ele devolvia o cache e o usuário
+     * achava que tinha verificado quando não tinha.
+     */
+    suspend fun check(context: Context, force: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
         val appCtx = context.applicationContext
         val prefs = appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -81,38 +106,57 @@ object UpdateChecker {
 
         val now = System.currentTimeMillis()
 
-        // Gap mínimo: morto e reaberto em segundos não martela a API.
-        val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0L)
-        if (now - lastCheck < MIN_GAP_MS) return@withContext readCache(prefs)
-        // Mesmo processo: já consultou há menos de 1h → usa o cache.
-        if (checkedThisProcess && now - lastCheck < SAME_PROCESS_GAP_MS) {
-            return@withContext readCache(prefs)
+        // Gap mínimo: morto e reaberto em segundos não martela a rede.
+        // force = true pula os dois gaps (o usuário PEDIU pra ver agora).
+        if (!force) {
+            val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0L)
+            if (now - lastCheck < MIN_GAP_MS) return@withContext readCache(prefs)
+            // Mesmo processo: já consultou há menos de 1h → usa o cache.
+            if (checkedThisProcess && now - lastCheck < SAME_PROCESS_GAP_MS) {
+                return@withContext readCache(prefs)
+            }
         }
         checkedThisProcess = true
 
         try {
             prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
-            // Rota 1 (API) falhou (403 rate limit, rede, parse)? Rota 2 (atom).
-            val info = fetchViaApi() ?: fetchViaAtom()
+            // ROTA 1 (PRINCIPAL, sem rate limit): o feed releases.atom é
+            // servido pelo site do GitHub — não tem o limite de 60 req/hora
+            // por IP da API REST (a causa do card mudo em 4G/CGNAT, bug da
+            // v0.22.15). ROTA 2 (RESERVA): a API oficial, que traz os
+            // ASSETS (link e tamanho real do APK) que o atom não tem.
+            val info = fetchViaAtom() ?: fetchViaApi()
             val current = currentVersion(appCtx) ?: return@withContext readCache(prefs)
             val update = info?.takeIf { isNewer(it.version, current) }
 
+            // v0.22.23: a versão DISPENSADA não pode voltar a avisar só
+            // porque o app foi reaberto depois do throttle. Só uma versão
+            // NOVA a ressuscita — e, ao ressuscitar, o registro do
+            // dispensado é limpo (senão ficaria pra sempre na prefs).
+            val dismissed = prefs.getString(KEY_DISMISSED, null)
+            if (dismissed != null && update != null && isNewer(update.version, dismissed)) {
+                prefs.edit().remove(KEY_DISMISSED).apply()
+            }
+            val shown = update?.takeIf { it.version != dismissed }
+
             prefs.edit()
-                .putString(KEY_CACHE, update?.let { toJson(it) })
+                .putString(KEY_CACHE, shown?.let { toJson(it) })
                 .apply()
-            update
+            shown
         } catch (t: Throwable) {
             // Falhou a rede? Mostra o que tiver em cache; senão, nada.
             readCache(prefs)
         }
     }
 
-    /** ROTA 1 — API oficial: JSON completo com os assets da release
-     *  (link e tamanho reais do APK). Qualquer falha = null (cai pro atom). */
+    /** ROTA 2 (RESERVA) — API oficial: JSON completo com os assets da release
+     *  (link e tamanho reais do APK). Qualquer falha = null (cai pro atom,
+     *  que é a rota principal). */
     private fun fetchViaApi(): UpdateInfo? = try {
         val request = Request.Builder()
             .url(API)
             .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", USER_AGENT)
             .build()
         http.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) return null
@@ -124,36 +168,20 @@ object UpdateChecker {
             val notes = json.optString("body", "").trim()
             if (version.isBlank() || url.isBlank()) return null
 
-            // acha o APK instalável entre os assets (TuneGrab-vX.apk — o
-            // -debug fica de fora)
-            var apkUrl = ""
-            var apkSize = 0L
-            val assets = json.optJSONArray("assets")
-            if (assets != null) {
-                for (i in 0 until assets.length()) {
-                    val a = assets.optJSONObject(i) ?: continue
-                    val name = a.optString("name", "")
-                    if (name.endsWith(".apk") && name.startsWith("TuneGrab-")
-                        && !name.contains("debug")
-                    ) {
-                        apkUrl = a.optString("browser_download_url", "")
-                        apkSize = a.optLong("size", 0L)
-                        break
-                    }
-                }
-            }
+            val (apkUrl, apkSize) = findApkAsset(json)
             UpdateInfo(version, notes, url, apkUrl, apkSize)
         }
     } catch (t: Throwable) {
         null
     }
 
-    /** ROTA 2 — feed releases.atom do github.com: MESMAS releases, SEM o
-     *  rate limit da API. O feed lista as mais recentes primeiro; pula
-     *  pré-release declarada no título (mesma regra do "latest" da API,
-     *  que só devolve release estável). */
+    /** ROTA 1 (PRINCIPAL) — feed releases.atom do github.com: SEM rate limit
+     *  de API (endpoint de site/CDN). O feed lista as mais recentes primeiro
+     *  (as 10 últimas); pula pré-release (mesma regra da API, que só devolve
+     *  release estável). */
     private fun fetchViaAtom(): UpdateInfo? = try {
-        val request = Request.Builder().url(ATOM).build()
+        val request = Request.Builder()
+            .url(ATOM).header("User-Agent", USER_AGENT).build()
         http.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) return null
             val xml = resp.body?.string() ?: return null
@@ -162,7 +190,15 @@ object UpdateChecker {
             val tagRegex = Regex("releases/tag/(v?[0-9][^\"<&?]+)")
             val titleRegex = Regex("<title>([^<]*)</title>")
             val contentRegex = Regex("<content[^>]*>(.*?)</content>", RegexOption.DOT_MATCHES_ALL)
-            val preRelease = Regex("(?i)\\b(beta|rc|alpha|prerelease)\\b")
+            // v0.22.23: filtro de pré-release CORRIGIDO. O antigo era
+            // (?i)\b(beta|rc|alpha|prerelease)\b — o \b exige fronteira de
+            // palavra e o NÚMERO COLADO ("rc2", "beta1") quebra a fronteira,
+            // então as pré-releases mais comuns passavam direto e viravam
+            // "latest" no app. Agora o número é aceito como sufixo.
+            val preRelease = Regex(
+                "(?i)(?:^|[^a-z0-9])(beta|rc|alpha|pre|preview|snapshot|" +
+                    "nightly|canary|eap|dev)(?:[._-]?\\d+)?(?:[^a-z0-9]|$)"
+            )
 
             for (entry in entryRegex.findAll(xml)) {
                 val e = entry.groupValues[1]
@@ -176,7 +212,9 @@ object UpdateChecker {
                 val notes = contentRegex.find(e)?.groupValues?.get(1)
                     ?.let(::stripHtml) ?: ""
                 // APK com o nome determinístico do CI; tamanho 0 = desconhecido
-                // (o instalador lida: usa o content-length da resposta real)
+                // (o instalador lida: usa o content-length da resposta real).
+                // Se um dia esse link der 404, o UpdateInstaller pede o link
+                // DE VERDADE à API (resolveApkUrl) e tenta de novo.
                 val apkUrl =
                     "https://github.com/micsxnn/TuneGrab/releases/download/$tag/TuneGrab-$tag.apk"
                 return UpdateInfo(version, notes, url, apkUrl, 0L)
@@ -185,6 +223,56 @@ object UpdateChecker {
         }
     } catch (t: Throwable) {
         null
+    }
+
+    /**
+     * v0.22.23: o link REAL do APK, tirado da API oficial.
+     *
+     * A rota principal (atom) monta a URL pelo padrão do CI
+     * (TuneGrab-<tag>.apk). Se esse padrão mudar um dia (ou a release for
+     * renomeada), o link montado dá 404 e o download falha — aqui a API
+     * responde com o asset de verdade.
+     *
+     * Chamada SÓ no 404: uma requisição rara, nunca no caminho normal.
+     */
+    suspend fun resolveApkUrl(context: Context, info: UpdateInfo): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url(API)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", USER_AGENT)
+                    .build()
+                http.newCall(request).execute().use { resp ->
+                    if (!resp.isSuccessful) return@withContext null
+                    val json = JSONObject(resp.body?.string() ?: return@withContext null)
+                    findApkAsset(json).first.takeIf { it.isNotBlank() }
+                }
+            } catch (t: Throwable) {
+                null
+            }
+        }
+
+    /** Acha o APK instalável entre os assets (TuneGrab-vX.apk — o -debug
+     *  fica de fora). Devolve (url, tamanho em bytes). */
+    private fun findApkAsset(json: JSONObject): Pair<String, Long> {
+        var apkUrl = ""
+        var apkSize = 0L
+        val assets = json.optJSONArray("assets")
+        if (assets != null) {
+            for (i in 0 until assets.length()) {
+                val a = assets.optJSONObject(i) ?: continue
+                val name = a.optString("name", "")
+                if (name.endsWith(".apk") && name.startsWith("TuneGrab-")
+                    && !name.contains("debug")
+                ) {
+                    apkUrl = a.optString("browser_download_url", "")
+                    apkSize = a.optLong("size", 0L)
+                    break
+                }
+            }
+        }
+        return apkUrl to apkSize
     }
 
     /** O content do atom vem com o corpo da release já RENDERIZADO em HTML
@@ -217,7 +305,7 @@ object UpdateChecker {
         .replace(Regex("\\*([^*]+)\\*"), "$1")
         .replace(Regex("__([^_]+)__"), "$1")
         .replace(Regex("`([^`]*)`"), "$1")
-        .replace(Regex("\\[([^]]+)]\\([^)]*\\)"), "$1")
+        .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
         .replace(Regex("^\\s*[-*+]\\s+", RegexOption.MULTILINE), "• ")
         .replace(Regex("\\n{3,}"), "\n\n")
         .trim()

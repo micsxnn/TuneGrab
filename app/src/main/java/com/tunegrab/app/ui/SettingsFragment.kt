@@ -403,14 +403,19 @@ class SettingsFragment : Fragment() {
 
     /** Atualização manual: chama o MESMO UpdateChecker do card do Início
      *  (mesmo cache/throttle). Achou versão nova? Leva pro INÍCIO do app,
-     *  onde o card de baixar/instalar já está esperando (v0.19.9). */
+     *  onde o card de baixar/instalar já está esperando (v0.19.9).
+     *
+     *  v0.22.23: force = true — este botão é a CONSULTA MANUAL, então ele
+     *  pula o throttle e pergunta ao GitHub AGORA. Antes ele devolvia o
+     *  cache (se o app tinha sido aberto há menos de 10 min) e o usuário
+     *  achava que tinha verificado quando não tinha verificado nada. */
     private fun bindUpdate() {
         binding.pageUpdate.rowUpdate.setOnClickListener {
             val ctx = requireContext()
             binding.pageUpdate.rowUpdate.isEnabled = false
             binding.pageUpdate.tvUpdateStatus.setText(R.string.update_checking)
             viewLifecycleOwner.lifecycleScope.launch {
-                val info = UpdateChecker.check(ctx)
+                val info = UpdateChecker.check(ctx, force = true)
                 if (_binding == null) return@launch // a aba saiu da tela no meio
                 binding.pageUpdate.rowUpdate.isEnabled = true
                 if (info != null) {

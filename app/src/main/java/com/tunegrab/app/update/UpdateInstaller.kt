@@ -105,7 +105,15 @@ object UpdateInstaller {
         return !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
     }
 
-    /** Baixa o APK com progresso (0–100). Apaga o parcial em qualquer falha. */
+    /**
+     * Baixa o APK com progresso (0–100). Apaga o parcial em qualquer falha.
+     *
+     * v0.22.23: se o link do APK (montado pelo padrão do CI) der 404, o app
+     * pergunta à API oficial o link DE VERDADE do asset e tenta de novo.
+     * É a auto-cura: se um dia o padrão de nome do arquivo mudar, o app
+     * continua able a se atualizar. Uma requisição, SÓ nesse caso raro —
+     * o caminho normal não gasta nada.
+     */
     suspend fun download(
         context: Context,
         info: UpdateChecker.UpdateInfo,
@@ -116,42 +124,61 @@ object UpdateInstaller {
         target.parentFile?.mkdirs() ?: throw IOException("pasta de update indisponível")
         cleanOldApks(target)
         try {
-            val response = http.newCall(Request.Builder().url(info.apkUrl).build()).execute()
-            response.use { resp ->
-                if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
-                val body = resp.body ?: throw IOException("resposta sem corpo")
-                val total = if (body.contentLength() > 0) body.contentLength() else info.apkSize
-                body.byteStream().use { input ->
-                    target.outputStream().use { out ->
-                        val buffer = ByteArray(64 * 1024)
-                        var read = 0L
-                        var lastPct = -1
-                        while (true) {
-                            val n = input.read(buffer)
-                            if (n < 0) break
-                            out.write(buffer, 0, n)
-                            read += n
-                            if (total > 0) {
-                                val pct = (read * 100 / total).toInt().coerceIn(0, 100)
-                                if (pct != lastPct) {
-                                    lastPct = pct
-                                    onProgress(pct)
-                                }
-                            }
-                        }
-                    }
-                }
+            try {
+                downloadTo(info.apkUrl, target, info, onProgress)
+            } catch (notFound: Http404) {
+                val real = UpdateChecker.resolveApkUrl(context, info)
+                if (real.isNullOrBlank() || real == info.apkUrl) throw notFound
+                downloadTo(real, target, info, onProgress)
             }
-            if (target.length() <= 0L) throw IOException("arquivo vazio")
-            if (info.apkSize > 0L && target.length() != info.apkSize) {
-                throw IOException("tamanho inesperado (${target.length()} ≠ ${info.apkSize})")
-            }
-            target
         } catch (t: Throwable) {
             target.delete()
             throw t
         }
     }
+
+    /** O download propriamente dito (um link só). */
+    private fun downloadTo(
+        url: String,
+        target: File,
+        info: UpdateChecker.UpdateInfo,
+        onProgress: (Int) -> Unit
+    ) {
+        val response = http.newCall(Request.Builder().url(url).build()).execute()
+        response.use { resp ->
+            if (resp.code == 404) throw Http404()
+            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+            val body = resp.body ?: throw IOException("resposta sem corpo")
+            val total = if (body.contentLength() > 0) body.contentLength() else info.apkSize
+            body.byteStream().use { input ->
+                target.outputStream().use { out ->
+                    val buffer = ByteArray(64 * 1024)
+                    var read = 0L
+                    var lastPct = -1
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        out.write(buffer, 0, n)
+                        read += n
+                        if (total > 0) {
+                            val pct = (read * 100 / total).toInt().coerceIn(0, 100)
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                onProgress(pct)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (target.length() <= 0L) throw IOException("arquivo vazio")
+        if (info.apkSize > 0L && target.length() != info.apkSize) {
+            throw IOException("tamanho inesperado (${target.length()} ≠ ${info.apkSize})")
+        }
+    }
+
+    /** O link do APK não existe (404) — a auto-cura tenta o link real. */
+    private class Http404 : IOException("HTTP 404")
 
     /** O aparelho pode instalar direto, ou precisa da autorização de fontes desconhecidas? */
     fun needsInstallPermission(context: Context): Boolean {
