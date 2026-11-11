@@ -1,6 +1,7 @@
 package com.tunegrab.app.download
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -59,6 +60,9 @@ object DownloadBus {
 
     /** De quanto em quanto tempo o espelho é gravado (ms). */
     private const val PERSIST_INTERVAL_MS = 1_000L
+
+    /** Tag do log de diagnóstico do espelho (v0.22.22). */
+    private const val TAG = "TuneGrabBus"
 
     /**
      * v0.22.21: liga o espelho ao disco e REPOVOA o que foi gravado antes.
@@ -137,6 +141,14 @@ object DownloadBus {
             // PRESERVADO — relançar o mesmo job NÃO pode zerar o card.
             // Só o título é corrigido se mudou.
             if (current.state == State.RUNNING || current.state == State.PAUSED) {
+                // v0.22.22 (DIAGNÓSTICO): o log mostra o que o card exibia
+                // ANTES e DEPOIS do start() — se o card ainda resetar, este
+                // log diz qual chamada zerou o percentual.
+                Log.i(
+                    TAG,
+                    "start preservado: $fileName — estado=${current.state} " +
+                        "percent=${current.percent} fase='${current.phase}'"
+                )
                 if (current.title != title) {
                     list[idx] = current.copy(title = title, updatedAt = System.currentTimeMillis())
                     _items.value = list
@@ -146,10 +158,15 @@ object DownloadBus {
             }
             // item ENCERRADO (cancelado/falhado) e o mesmo arquivo foi pedido
             // de novo → recomeça do zero (percent 0, barra indeterminada).
+            Log.i(
+                TAG,
+                "start RECOMEÇA do zero: $fileName — estado anterior=${current.state}"
+            )
             list[idx] = Item(fileName = fileName, title = title)
             _items.value = list
             persist(force = true)
         } else {
+            Log.i(TAG, "start novo item: $fileName")
             list.add(0, Item(fileName = fileName, title = title))
             _items.value = list
             persist(force = true)
@@ -171,6 +188,18 @@ object DownloadBus {
         indeterminate: Boolean,
         speed: String? = null
     ) {
+        // v0.22.22 (DIAGNÓSTICO): o log mostra quando o percentual CHEGA
+        // menor do que o card já exibia (a situação que zeraria o card
+        // antes do maxOf) — e também quando a barra volta a ficar
+        // indeterminada (que esconde o percentual na tela).
+        val before = _items.value.firstOrNull { it.fileName == fileName }
+        if (before != null && percent < before.percent) {
+            Log.w(
+                TAG,
+                "progress REBAIXADO (ignorado): $fileName — veio $percent%, " +
+                    "card já estava em ${before.percent}%"
+            )
+        }
         mutate(fileName) {
             it.copy(
                 phase = phase,

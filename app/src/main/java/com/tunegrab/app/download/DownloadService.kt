@@ -148,6 +148,17 @@ class DownloadService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannel()
+        // v0.22.22 (DIAGNÓSTICO): o log mostra POR QUE o service foi
+        // (re)iniciado — é o que reinicia o card da Central. Se o card
+        // resetar, este log diz se foi um intent novo, um intent de
+        // retomada, ou o service revivido pelo START_STICKY sem intent.
+        Log.i(
+            TAG,
+            "onStartCommand: action=${intent?.action ?: "(sem intent)"} " +
+                "file=${intent?.getStringExtra(EXTRA_FILE) ?: "-"} " +
+                "resume=${intent?.getBooleanExtra(EXTRA_RESUME, false) ?: false} " +
+                "startId=$startId"
+        )
         // cada startForegroundService EXIGE startForeground imediato (contrato do
         // Android) — em ação de controle sem trabalho, é notificação neutra + stop
         startForeground(NOTIF_ID, lastProgressNotif ?: idleNotification())
@@ -791,6 +802,7 @@ class DownloadService : Service() {
                 ?: stickyJob?.intent
                 ?: ActiveJobStore.load(applicationContext)?.let { jobToIntent(it) }
             if (relaunch != null && taskRemoved) {
+                Log.i(TAG, "relançando o job (app fechado dos recentes): ${relaunch.getStringExtra(EXTRA_FILE)}")
                 try {
                     // v0.22.18: marca como RETOMADA — o download relançado
                     // continua dos parciais em disco (não recomeça do zero).

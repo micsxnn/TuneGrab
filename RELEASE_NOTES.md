@@ -1,15 +1,15 @@
-O card do download não resets mais quando você troca de aba.
+Versão de teste do conserto do card do download.
 
-Antes, se você saía da Central de Downloads pra outra seção e voltava, o
-card do que estava baixando voltava pra zero, como se o download tivesse
-começado de novo. Agora ele continua exatamente onde estava, mostrando a
-porcentagem e a velocidade certaininhas.
+É a mesma correção da v0.22.21, só que empacotada de novo pra você poder
+baixar pelo botão de atualizar do app e testar no seu aparelho.
 
-O mesmo vale pro app inteiro: se o Android fechar o app pra liberar memória
-no meio de um download, o download continua (isso já foi arrumado antes) e,
-quando você abre o app de novo, o card já aparece no ponto em que parou, em
-vez de sumir ou mostrar zero.
+O que você vai notar:
 
-De quebra, o card não fica mais piscando ou pulando enquanto baixa: agora
-só o que muda de verdade é redesenhado na tela, então o progresso anda
-tranquilo.
+- Comece um download na Central e vá pra outra seção. Quando voltar, o card
+  tem que estar no mesmo ponto, com a porcentagem e a velocidade.
+- Se o Android fechar o app pra liberar memória no meio do download, o
+  download continua e, ao abrir o app de novo, o card aparece no ponto em
+  que parou.
+- O card não pisca nem pula mais enquanto baixa.
+
+Se o card ainda resetar, me fala que eu continuo atrás.
