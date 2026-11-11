@@ -85,17 +85,17 @@ object DownloadBusStore {
             val out = ArrayList<DownloadBus.Item>(array.length())
             for (idx in 0 until array.length()) {
                 val json = array.optJSONObject(idx) ?: continue
-                val fileName = json.optString("file").takeIf { it.isNotBlank() } ?: continue
+                val fileName = json.optString("file").nullIfBlank() ?: continue
                 out.add(
                     DownloadBus.Item(
                         fileName = fileName,
-                        title = json.optString("title").takeIf { it.isNotBlank() } ?: fileName,
-                        phase = json.optString("phase"),
+                        title = json.optString("title").nullIfBlank() ?: fileName,
+                        phase = json.optString("phase").orEmpty(),
                         percent = json.optInt("percent", 0).coerceIn(0, 100),
                         indeterminate = json.optBoolean("indeterminate", false),
                         state = parseState(json.optString("state")),
-                        detail = json.optString("detail").takeIf { it.isNotBlank() },
-                        speed = json.optString("speed").takeIf { it.isNotBlank() },
+                        detail = json.optString("detail").nullIfBlank(),
+                        speed = json.optString("speed").nullIfBlank(),
                         updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                     )
                 )
@@ -123,11 +123,23 @@ object DownloadBusStore {
         }
     }
 
-    private fun parseState(raw: String?): DownloadBus.State = when (raw) {
+    private fun parseState(raw: String?): DownloadBus.State = when (raw?.nullIfBlank()) {
         DownloadBus.State.DONE.name -> DownloadBus.State.DONE
         DownloadBus.State.FAILED.name -> DownloadBus.State.FAILED
         DownloadBus.State.PAUSED.name -> DownloadBus.State.PAUSED
         DownloadBus.State.CANCELLED.name -> DownloadBus.State.CANCELLED
         else -> DownloadBus.State.RUNNING
+    }
+
+    /**
+     * Texto do JSON que pode estar ausente (JSONObject.NULL) ou em branco.
+     * O [org.json.JSONObject.optString] pode devolver a LITERAL "null" pra um
+     * JSONObject.NULL em algumas versões do Android — isso é tratado como
+     * ausente (e não como o texto "null" na tela).
+     */
+    private fun String?.nullIfBlank(): String? {
+        val v = this ?: return null
+        if (v.isBlank() || v == "null") return null
+        return v
     }
 }
