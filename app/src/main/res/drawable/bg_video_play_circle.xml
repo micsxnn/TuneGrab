@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Botão de play/pause GRANDE dos controles de vídeo (v0.22.20): disco
+     dourado da paleta do app (mesmo do player de áudio, bg_play_circle),
+     com um halo translúcido atrás pra destacar em qualquer cena do vídeo.
+     O anel externo é o "respiro" que faz o botão parecer flutuante. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- halo: mesmo dourado, mais suave e maior -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#4DF5D161" />
+        </shape>
+    </item>
+    <!-- disco cheio -->
+    <item android:left="6dp" android:top="6dp" android:right="6dp" android:bottom="6dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/primary" />
+        </shape>
+    </item>
+</layer-list>

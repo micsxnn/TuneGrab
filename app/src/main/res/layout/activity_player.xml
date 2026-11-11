@@ -25,7 +25,33 @@
         android:visibility="gone"
         app:resize_mode="fit"
         app:show_buffering="always"
-        app:use_controller="true" />
+        app:use_controller="false" />
+
+    <!-- CAMADA DE TOQUE (v0.22.20): fica ENTRE os players e o overlay dos
+         controles. Serve pra capturar o toque de "mostrar/esconder os
+         controles" SEM depender do comportamento do SurfaceView (o toque
+         num SurfaceView nem sempre chega no listener da View), e SEM
+         interceptar os botões (eles ficam numa camada DE CIMA e recebem o
+         toque primeiro). Clicável, sem fundo — invisível. -->
+    <View
+        android:id="@+id/videoTouchLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:focusable="false" />
+
+    <!-- CONTROLES DE VÍDEO PRÓPRIOS (v0.22.20, pedido do autor: "está muito
+         feio, e eu tenho que clicar bem no meio pra poder pausar, ou passar
+         pra frente, ou pra trás"). Substitui os controllers NATIVOS dos dois
+         players de vídeo (MediaController do VideoView e o controller padrão
+         do Media3) por um overlay ÚNICO no centro da tela:
+         [voltar 10s] [PLAY/PAUSE grande] [avançar 10s] + barra de progresso
+         fina com os tempos. Os dois players (vídeo local e vídeo HD DASH)
+         usam ESTE overlay, então a cara é a mesma nos dois.
+         fica ACIMA dos players no FrameLayout = desenhado por cima do vídeo. -->
+    <include
+        android:id="@+id/videoControls"
+        layout="@layout/view_video_controls" />
 
     <!-- Controles de ÁUDIO — estilo minimalista da referência (v0.18.8):
          cartão de arte grande com cantos bem redondos, waveform fina do som
@@ -272,13 +298,16 @@
         android:visibility="gone"
         app:tint="@color/on_background" />
 
-    <!-- Tela cheia do VÍDEO: gira o app para paisagem (só aparece no vídeo) -->
+    <!-- Tela cheia do VÍDEO: gira o app para paisagem (só aparece no vídeo).
+         v0.22.20: a margem de baixo é maior (72dp) pra o botão ficar ACIMA da
+         barra de progresso dos controles próprios (que mora no rodapé). -->
     <ImageButton
         android:id="@+id/btnFullscreen"
         android:layout_width="44dp"
         android:layout_height="44dp"
         android:layout_gravity="bottom|end"
-        android:layout_margin="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="72dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/player_fullscreen"
         android:src="@drawable/ic_fullscreen"

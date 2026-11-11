@@ -24,7 +24,6 @@ import android.util.Rational
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.CompoundButton
-import android.widget.MediaController
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -142,6 +141,20 @@ class PlayerActivity : AppCompatActivity() {
     // vídeo em tela cheia (gira o app, não o vídeo)
     private var fullscreen = false
 
+    // ================= CONTROLES DE VÍDEO PRÓPRIOS (v0.22.20) =================
+    // Substituem os controllers NATIVOS (MediaController do VideoView e o
+    // controller padrão do Media3) por um overlay ÚNICO no centro da tela:
+    // [voltar 10s] [PLAY/PAUSE grande] [avançar 10s] + barra de progresso.
+    // Motivo (pedido do autor): "está muito feio, e eu tenho que clicar bem
+    // no meio pra poder pausar, ou passar pra frente, ou pra trás" — os
+    // controles nativos têm o play no centro-baixo e exigem mira precisa.
+    //
+    // videoControlsVisible = os controles estão na tela (somem sozinhos
+    // depois de uns segundos de o vídeo tocar, como em qualquer player).
+    private var videoControlsVisible = true
+    private var videoUserSeeking = false
+    private var videoControlsHideJob: Runnable? = null
+
     private val tickHandler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -201,6 +214,17 @@ class PlayerActivity : AppCompatActivity() {
         sourceAuthor = intent.getStringExtra(EXTRA_SOURCE_AUTHOR)
         sourceDurationSec = intent.getLongExtra(EXTRA_SOURCE_DURATION, 0L)
         setupFavoriteButton()
+        // CONTROLES DE VÍDEO PRÓPRIOS (v0.22.20): o overlay do centro da
+        // tela (play grande + pular 10s) e a barra de progresso fina.
+        // Vale para os DOIS players de vídeo (local e HD DASH).
+        if (isVideo) {
+            setupVideoControls()
+        } else {
+            // ÁUDIO: a camada de toque e o overlay de vídeo ficam DESLIGADOS
+            // (senão a camada invisível roubaria toques do player de música)
+            binding.videoTouchLayer.isClickable = false
+            binding.videoControls.root.visibility = View.GONE
+        }
         when {
             // HD (v0.17.1): DASH do YouTube — vídeo até 720p + áudio separados,
             // MERGIDOS no ExoPlayer; se falhar na hora de tocar, cai pro muxed
@@ -235,6 +259,243 @@ class PlayerActivity : AppCompatActivity() {
 
     // ---------- vídeo ----------
 
+    /**
+     * CONTROLES DE VÍDEO PRÓPRIOS (v0.22.20, pedido do autor: "está muito
+     * feio, e eu tenho que clicar bem no meio pra poder pausar, ou passar pra
+     * frente, ou pra trás").
+     *
+     * O que muda: os dois players de vídeo do app (o VideoView do arquivo
+     * local/muxed e o PlayerView do Media3 no DASH) usam AGORA este overlay
+     * no CENTRO da tela, no lugar dos controllers nativos:
+     *   - [voltar 10s]  [PLAY/PAUSE 72dp dourado]  [avançar 10s]
+     *   - barra de progresso fina com os tempos embaixo
+     *
+     * O botão grande fica EXATAMENTE no centro — o polegar acerta sem mira,
+     * que era o defeito dos controllers nativos (play no centro-baixo,
+     * pequeno, colado na barra).
+     *
+     * Os controles somem sozinhos depois de uns segundos de o vídeo tocar
+     * (toque na tela traz de volta) — como em qualquer player de vídeo.
+     */
+    private fun setupVideoControls() {
+        val c = binding.videoControls
+
+        c.btnVideoPlay.setOnClickListener { toggleVideoPlayback() }
+        c.btnVideoBack10.setOnClickListener { seekVideoBy(-SEEK_STEP_MS) }
+        c.btnVideoForward10.setOnClickListener { seekVideoBy(SEEK_STEP_MS) }
+
+        // a barra de progresso: arrastar não pode ser atropelado pelo tick
+        c.videoSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                videoUserSeeking = true
+                val dur = videoDurationMs()
+                if (dur > 0) {
+                    c.videoPosition.text = formatMs((dur * progress / 1000).toInt())
+                }
+            }
+
+            override fun onStartTrackingTouch(bar: SeekBar?) {
+                videoUserSeeking = true
+                showVideoControls()
+                // durante o arraste os controles NÃO somem (o timer é
+                // cancelado — quem decide é o onStopTrackingTouch)
+                videoControlsHideJob?.let { tickHandler.removeCallbacks(it) }
+            }
+
+            override fun onStopTrackingTouch(bar: SeekBar?) {
+                videoUserSeeking = false
+                val dur = videoDurationMs()
+                val progress = bar?.progress ?: 0
+                if (dur > 0) seekVideoTo((dur * progress / 1000).toInt())
+                // volta a valer o sumir-sozinho
+                scheduleHideVideoControls()
+            }
+        })
+
+        // TOQUE NO VÍDEO: mostra/esconde os controles. É o que o autor
+        // esperava de um player bonito — o vídeo limpo enquanto assiste.
+        //
+        // Usa uma CAMADA DE TOQUE transparente (entre os players e os
+        // controles) em vez dos listeners dos próprios players: o toque num
+        // SurfaceView (o PlayerView do Media3 e o VideoView) nem sempre
+        // chega no listener da View — a camada garante que chegue.
+        // Os botões ficam numa camada DE CIMA e recebem o toque primeiro.
+        binding.videoTouchLayer.setOnClickListener { toggleVideoControls() }
+
+        showVideoControls()
+    }
+
+    /** Alterna play/pause — funciona nos DOIS players. */
+    private fun toggleVideoPlayback() {
+        val exo = exoPlayer
+        if (exo != null) {
+            if (exo.isPlaying) exo.pause() else exo.play()
+        } else {
+            try {
+                if (binding.videoView.isPlaying) binding.videoView.pause()
+                else binding.videoView.start()
+            } catch (ignored: Throwable) {
+            }
+        }
+        refreshVideoPlayIcon()
+        showVideoControls()
+    }
+
+    /** Pula 10 segundos para trás ou para frente (nos DOIS players). */
+    private fun seekVideoBy(deltaMs: Int) {
+        val dur = videoDurationMs()
+        val exo = exoPlayer
+        if (exo != null) {
+            // duração desconhecida (0) = sem teto: deixa o player decidir
+            val target = if (dur > 0) {
+                (exo.currentPosition + deltaMs).coerceIn(0L, dur.toLong())
+            } else {
+                (exo.currentPosition + deltaMs).coerceAtLeast(0L)
+            }
+            exo.seekTo(target)
+        } else {
+            try {
+                val current = binding.videoView.currentPosition
+                val target = if (dur > 0) {
+                    (current + deltaMs).coerceIn(0, dur)
+                } else {
+                    (current + deltaMs).coerceAtLeast(0)
+                }
+                binding.videoView.seekTo(target)
+            } catch (ignored: Throwable) {
+            }
+        }
+        showVideoControls()
+    }
+
+    /** Vai pra uma posição (ms) — usado pela barra de progresso. */
+    private fun seekVideoTo(positionMs: Int) {
+        val exo = exoPlayer
+        if (exo != null) {
+            exo.seekTo(positionMs.toLong())
+        } else {
+            try {
+                binding.videoView.seekTo(positionMs)
+            } catch (ignored: Throwable) {
+            }
+        }
+    }
+
+    /** Posição atual do vídeo (ms) — dos DOIS players. */
+    private fun videoPositionMs(): Int {
+        val exo = exoPlayer
+        if (exo != null) return exo.currentPosition.toInt()
+        return try {
+            binding.videoView.currentPosition
+        } catch (ignored: Throwable) {
+            0
+        }
+    }
+
+    /** Duração total do vídeo (ms) — dos DOIS players. 0 = desconhecida. */
+    private fun videoDurationMs(): Int {
+        val exo = exoPlayer
+        if (exo != null) {
+            val d = exo.duration
+            // o Media3 devolve C.TIME_UNSET (-9223372036854775807) quando a
+            // duração ainda não é conhecida
+            if (d > 0 && d < Int.MAX_VALUE) return d.toInt()
+        }
+        return try {
+            // o MediaPlayer devolve -1 quando não sabe a duração
+            val d = binding.videoView.duration
+            if (d > 0) d else 0
+        } catch (ignored: Throwable) {
+            0
+        }
+    }
+
+    /** O vídeo está tocando agora? (dos DOIS players) */
+    private fun isVideoPlaying(): Boolean {
+        val exo = exoPlayer
+        if (exo != null) return exo.isPlaying
+        return try {
+            binding.videoView.isPlaying
+        } catch (ignored: Throwable) {
+            false
+        }
+    }
+
+    /** Mostrar/esconder os controles (toque na tela). */
+    private fun toggleVideoControls() {
+        if (videoControlsVisible) hideVideoControls() else showVideoControls()
+    }
+
+    /** Mostra os controles e marca o prazo de sumirem sozinhos. */
+    private fun showVideoControls() {
+        if (!isVideo) return
+        videoControlsVisible = true
+        binding.videoControls.videoCenterControls.visibility = View.VISIBLE
+        binding.videoControls.videoBottomBar.visibility = View.VISIBLE
+        binding.videoControls.videoScrim.visibility = View.VISIBLE
+        // com os controles na tela, a camada de toque FICA desligada — os
+        // botões e a barra recebem o toque direto (sem o "toggle" disparando
+        // por baixo e escondendo tudo no primeiro toque)
+        binding.videoTouchLayer.isClickable = false
+        refreshVideoPlayIcon()
+        scheduleHideVideoControls()
+    }
+
+    /** Esconde os controles (vídeo limpo na tela). */
+    private fun hideVideoControls() {
+        videoControlsVisible = false
+        binding.videoControls.videoCenterControls.visibility = View.GONE
+        binding.videoControls.videoBottomBar.visibility = View.GONE
+        binding.videoControls.videoScrim.visibility = View.GONE
+        // sem controles na tela, a camada de toque volta a capturar o toque
+        // (um toque em qualquer lugar traz os controles de volta)
+        binding.videoTouchLayer.isClickable = true
+    }
+
+    /** some sozinho depois de 3,5s de o vídeo tocar sem toque */
+    private fun scheduleHideVideoControls() {
+        videoControlsHideJob?.let { tickHandler.removeCallbacks(it) }
+        val job = Runnable {
+            if (isVideoPlaying()) hideVideoControls()
+        }
+        videoControlsHideJob = job
+        tickHandler.postDelayed(job, VIDEO_CONTROLS_TIMEOUT_MS)
+    }
+
+    /** Ícone do botão grande: play ou pause (acompanha o estado real). */
+    private fun refreshVideoPlayIcon() {
+        if (!isVideo) return
+        val playing = isVideoPlaying()
+        val icon = if (playing) R.drawable.ic_pause else R.drawable.ic_play
+        val btn = binding.videoControls.btnVideoPlay
+        if (btn.tag != icon) {
+            btn.tag = icon
+            btn.setImageResource(icon)
+            btn.contentDescription = getString(
+                if (playing) R.string.player_pause else R.string.player_play
+            )
+        }
+    }
+
+    /** Atualiza a barra de progresso e os tempos (chamado pelo tick). */
+    private fun updateVideoControls() {
+        if (!isVideo) return
+        val c = binding.videoControls
+        val dur = videoDurationMs()
+        if (dur > 0) {
+            c.videoDuration.text = formatMs(dur)
+        }
+        if (!videoUserSeeking) {
+            val pos = videoPositionMs()
+            if (dur > 0) {
+                c.videoSeekBar.progress = ((pos.toLong() * 1000) / dur).toInt().coerceIn(0, 1000)
+            }
+            c.videoPosition.text = formatMs(pos)
+        }
+        refreshVideoPlayIcon()
+    }
+
     private fun setupVideo(uri: Uri) {
         // não sobrepor a música em segundo plano
         PlaybackService.stopNow(this)
@@ -247,9 +508,10 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnFullscreen.visibility = View.VISIBLE
         binding.btnFullscreen.setOnClickListener { setFullscreen(!fullscreen) }
 
-        val controller = MediaController(this)
-        controller.setAnchorView(binding.videoView)
-        binding.videoView.setMediaController(controller)
+        // v0.22.20: o MediaController NATIVO do Android sai de cena — ele
+        // colocava o play no centro-baixo (precisava de mira precisa) e era
+        // feio. Agora os controles são os PRÓPRIOS do app, no centro da tela.
+        binding.videoView.setMediaController(null)
 
         // stream do YouTube (reproduzir sem baixar): alguns servidores do
         // googlevideo recusam User-Agent estranho — usa o mesmo da extração
@@ -325,8 +587,10 @@ class PlayerActivity : AppCompatActivity() {
         binding.playerView.visibility = View.VISIBLE
         binding.btnFullscreen.visibility = View.VISIBLE
         binding.btnFullscreen.setOnClickListener { setFullscreen(!fullscreen) }
-        // o botão de tela cheia do próprio controller também gira o app
-        binding.playerView.setFullscreenButtonClickListener { setFullscreen(!fullscreen) }
+        // v0.22.20: o controller NATIVO do Media3 fica desligado (useController
+        // = false no layout) — os controles são os PRÓPRIOS do app. Por isso
+        // o setFullscreenButtonClickListener do controller não é usado mais:
+        // o botão de tela cheia é o do app (canto inferior direito).
 
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(DownloaderImpl.USER_AGENT) // googlevideo recusa UA estranho
@@ -405,7 +669,19 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnFullscreen.contentDescription = getString(
             if (on) R.string.player_exit_fullscreen else R.string.player_fullscreen
         )
+        // v0.22.20: o botão de tela cheia sobe um pouco pra NÃO ficar em cima
+        // da barra de progresso (que agora mora no rodapé da tela)
+        val lp = binding.btnFullscreen.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.bottomMargin = if (on) 0 else dp(72)
+        binding.btnFullscreen.layoutParams = lp
+        // v0.22.20: ao girar, os controles de vídeo aparecem de novo (a
+        // orientação mudou — o layout precisa ser revisto pelo olho)
+        if (isVideo) showVideoControls()
     }
+
+    /** Converte dp em px (pra margens do layout). */
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun applySystemBars() {
         val controller = WindowInsetsControllerCompat(window, binding.root)
@@ -728,7 +1004,12 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun updatePosition() {
-        if (isVideo) return
+        // VÍDEO (v0.22.20): o tick também cuida dos controles próprios —
+        // barra de progresso, tempos e o ícone de play/pause.
+        if (isVideo) {
+            updateVideoControls()
+            return
+        }
         val svc = playback ?: return
         val dur = svc.duration()
         if (dur > 0 && binding.seekBar.max != dur) {
@@ -964,8 +1245,12 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnClose.visibility = View.GONE
         binding.btnFavorite.visibility = View.GONE
         binding.btnFullscreen.visibility = View.GONE
+        // v0.22.20: na janelinha só o vídeo — os controles PRÓPRIOS também
+        // saem de cena (o sistema dá fechar/expandir). O controller nativo do
+        // Media3 continua desligado (useController=false no layout).
         binding.playerView.useController = false
         binding.playerView.hideController()
+        hideVideoControls()
     }
 
     /** Voltou pra tela normal (expandiu a janelinha): controles de volta. */
@@ -976,7 +1261,9 @@ class PlayerActivity : AppCompatActivity() {
         if (favoriteIdentity() != null) binding.btnFavorite.visibility = View.VISIBLE
         if (isVideo) {
             binding.btnFullscreen.visibility = View.VISIBLE
-            binding.playerView.useController = true
+            // v0.22.20: os controles de volta são os PRÓPRIOS do app (o
+            // controller nativo do Media3 fica desligado pra sempre).
+            showVideoControls()
         }
     }
 
@@ -1036,6 +1323,9 @@ class PlayerActivity : AppCompatActivity() {
         // Configurações regem ao vivo, então o valor pode ter mudado
         // enquanto a tela estava fora de foco
         syncAutoplaySwitch()
+        // v0.22.20: voltou pra tela do VÍDEO → os controles reaparecem (a
+        // tela cheia também volta a mostrar os controles do app)
+        if (isVideo && !inPip) showVideoControls()
         if (pipJustExited) {
             // EXPANDIU a janelinha PiP: volta pra tela normal — o handoff
             // NUNCA aconteceu (o player seguiu tocando na janelinha), não
@@ -1088,6 +1378,9 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         tickHandler.removeCallbacks(tick)
+        // v0.22.20: cancela o timer de auto-esconder dos controles de vídeo
+        // (evita callback pendente numa activity morta)
+        videoControlsHideJob?.let { tickHandler.removeCallbacks(it) }
         // player fechou de vez: o valor da sessão morre com ele e o padrão
         // das Configurações volta a mandar (v0.19.21). isFinishing=false =
         // recriação de tela — a sessão continua.
@@ -1111,6 +1404,13 @@ class PlayerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "PlayerActivity"
+
+        // v0.22.20: controles de vídeo próprios
+        /** Passo dos botões de pular (10 segundos, como no YouTube). */
+        private const val SEEK_STEP_MS = 10_000
+        /** Os controles somem sozinhos depois deste tempo sem toque. */
+        private const val VIDEO_CONTROLS_TIMEOUT_MS = 3_500L
+
         const val EXTRA_TITLE = "title"
         const val EXTRA_IS_VIDEO = "is_video"
         const val EXTRA_VIDEO_URL = "video_url"

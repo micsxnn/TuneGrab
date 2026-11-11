@@ -384,6 +384,9 @@
     <string name="player_previous">Faixa anterior</string>
     <string name="player_next">Próxima faixa</string>
     <string name="player_close">Fechar</string>
+    <!-- v0.22.20: controles de vídeo próprios (botões grandes no centro) -->
+    <string name="player_seek_back">Voltar 10 segundos</string>
+    <string name="player_seek_forward">Avançar 10 segundos</string>
     <string name="player_err">Não foi possível reproduzir este arquivo.</string>
     <string name="player_err_stream">Não deu pra tocar esse vídeo. Tenta de novo em instantes</string>
     <string name="player_buffering">Carregando…</string>

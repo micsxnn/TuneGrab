@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CONTROLES DE VÍDEO (v0.22.20, pedido do autor: "está muito feio, e eu
+    tenho que clicar bem no meio pra poder pausar, ou passar pra frente, ou
+    pra trás").
+
+    O problema que isto resolve: os dois players de vídeo do app usavam os
+    controles NATIVOS (MediaController no VideoView, controller padrão do
+    Media3 no PlayerView). Os dois têm o mesmo defeito: o botão de play fica
+    no CENTRO-BAIXO, colado na barra de progresso, e é pequeno. Pra pausar
+    ou pular 10 segundos era preciso acertar o ponto exato do dedo no meio
+    da tela — e o VisualizerView já ocupa o centro no player de ÁUDIO, então
+    a área central também não é "livre" pra um botão solto.
+
+    A solução: um overlay PRÓPRIO, no CENTRO da tela, com três botões
+    GRANDES lado a lado:
+        [voltar 10s]  [PLAY/PAUSE]  [avançar 10s]
+    O de play é um disco dourado de 72dp (o mesmo do player de áudio, que o
+    autor já aprovou); os de seek são discos translúcidos de 52dp. Tudo bem
+    no centro da tela — o polegar chega sem mira.
+
+    A BARRA DE PROGRESSO do vídeo também entra aqui (era a do controller
+    nativo, fina e sem identidade): mesma finesse do player de áudio, com
+    os tempos embaixo.
+
+    ESTE overlay é usado pelos DOIS players (VideoView local/muxed e PlayerView
+    do Media3), então a aparência e o comportamento são idênticos nos dois.
+
+    A raiz é um FrameLayout (NÃO <merge>) porque este arquivo é incluído via
+    <include> — o ViewBinding do Android não suporta <merge> em included
+    layout, e o projeto já usa esse padrão nos includes de page_*.xml.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- ESCURECIMENTO atrás dos controles: garante que os ícones claros
+         apareçam sobre qualquer cena do vídeo (uma cena clara engolia o
+         branco). Gradiente suave, não um bloco preto. -->
+    <View
+        android:id="@+id/videoScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_video_scrim"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <!-- ================= CONTROLES DO CENTRO ================= -->
+    <LinearLayout
+        android:id="@+id/videoCenterControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <!-- Voltar 10 segundos -->
+        <ImageButton
+            android:id="@+id/btnVideoBack10"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_video_control_circle"
+            android:contentDescription="@string/player_seek_back"
+            android:padding="12dp"
+            android:src="@drawable/ic_replay_10"
+            app:tint="@color/on_background" />
+
+        <!-- PLAY/PAUSE — o botão grande do meio -->
+        <ImageButton
+            android:id="@+id/btnVideoPlay"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:background="@drawable/bg_video_play_circle"
+            android:contentDescription="@string/player_play"
+            android:padding="19dp"
+            android:src="@drawable/ic_play"
+            app:tint="@color/background" />
+
+        <!-- Avançar 10 segundos -->
+        <ImageButton
+            android:id="@+id/btnVideoForward10"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_video_control_circle"
+            android:contentDescription="@string/player_seek_forward"
+            android:padding="12dp"
+            android:src="@drawable/ic_forward_10"
+            app:tint="@color/on_background" />
+    </LinearLayout>
+
+    <!-- ================= BARRA DE PROGRESSO ================= -->
+    <LinearLayout
+        android:id="@+id/videoBottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="16dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <SeekBar
+            android:id="@+id/videoSeekBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="1000"
+            android:progressDrawable="@drawable/bg_video_progress"
+            android:thumbTint="@color/primary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/videoPosition"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/on_surface_variant"
+                android:textSize="12sp"
+                tools:text="0:42" />
+
+            <TextView
+                android:id="@+id/videoDuration"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:textColor="@color/on_surface_variant"
+                android:textSize="12sp"
+                tools:text="3:58" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

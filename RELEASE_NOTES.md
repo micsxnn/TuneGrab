@@ -1,14 +1,16 @@
-O app ficou limpo de emojis.
+O player de vídeo ficou bom de usar.
 
-Saiu o último resto de enfeite das telas: o tique de "deu certo" nos avisos, a
-nota musical no letreiro do Início, no botão de começar e no botão de liberar
-o app, o dedo do seletor de formato, a mãozinha do erro do player e a seta
-dupla da mensagem de bloqueio do YouTube. Agora cada aviso é só a frase, sem
-símbolo grudado.
+Antes, os controles ficavam espremidos embaixo do vídeo e você tinha que
+acertar bem o meio da tela pra pausar, passar pra frente ou voltar. Agora o
+botão grande de play fica no centro, com os botões de pular 10 segundos dos
+dois lados. É só encostar.
 
-O aviso de "Playlist na fila" e o card de versão nova também já estavam limpos
-desde a versão passada.
+A barra de progresso também mudou: agora é fina, dourada, e mostra o tempo
+que passou e o tempo total embaixo, igual à do player de música.
 
-O download continua baixando em segundo plano, como antes.
+O outro detalhe bom é que os controles somem sozinhos depois de alguns
+segundos, deixando o vídeo limpo pra assistir. Um toque na tela traz eles de
+volta.
 
-Boa audição.
+Vale pros dois tipos de vídeo: o que você baixou e o que toca direto da
+rede.

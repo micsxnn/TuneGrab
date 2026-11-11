@@ -386,6 +386,7 @@ versão oficial.
 - [x] **Download que não morre: continua em segundo plano ao trocar de aba ou fechar o app, e retoma do ponto em que parou** (v0.22.18)
 - [x] **Sem emoji de festa nos avisos do app (card de atualização e aviso de playlist)** (v0.22.19)
 - [x] **Telas sem enfeite: saem o tique de confirmação, a nota musical, o dedo, a mãozinha e a seta dupla dos avisos** (v0.22.19)
+- [x] **Player de vídeo bonito: botão grande de play no centro, pular 10 segundos dos dois lados, barra de progresso fina e controles que somem sozinhos** (v0.22.20)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scrim dos controles de vídeo (v0.22.20): escurece a tela em volta dos
+     botões pra os ícones claros aparecerem sobre QUALQUER cena do vídeo
+     (uma cena clara engolia o branco puro). Gradiente radial suave —
+     escurece o CENTRO (onde ficam os botões) e some nas bordas, então o
+     vídeo continua parecendo limpo. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:centerColor="#8C000000"
+        android:endColor="#14000000"
+        android:gradientRadius="60%p"
+        android:startColor="#8C000000"
+        android:type="radial" />
+</shape>
