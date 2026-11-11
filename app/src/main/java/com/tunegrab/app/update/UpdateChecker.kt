@@ -62,6 +62,8 @@ object UpdateChecker {
     private const val ATOM = "https://github.com/micsxnn/TuneGrab/releases.atom"
     // ROTA 2 (RESERVA): API oficial — só quando o atom falha; traz os assets.
     private const val API = "https://api.github.com/repos/micsxnn/TuneGrab/releases/latest"
+    // API por TAG — usada só na auto-cura do 404 (a release exata).
+    private const val API_TAGS = "https://api.github.com/repos/micsxnn/TuneGrab/releases/tags"
     private const val PREFS = "update_checker"
     private const val KEY_LAST_CHECK = "last_check_ms"
     private const val KEY_CACHE = "cached_update_json"
@@ -233,25 +235,32 @@ object UpdateChecker {
      * renomeada), o link montado dá 404 e o download falha — aqui a API
      * responde com o asset de verdade.
      *
+     * Consulta pela TAG EXATA da release que o app está baixando (não pela
+     * "latest"): se sair uma versão nova entre o check e o download, a
+     * "latest" seria outra e o app baixaria o APK errado no lugar do
+     * perguntado.
+     *
      * Chamada SÓ no 404: uma requisição rara, nunca no caminho normal.
      */
-    suspend fun resolveApkUrl(context: Context, info: UpdateInfo): String? =
-        withContext(Dispatchers.IO) {
-            try {
-                val request = Request.Builder()
-                    .url(API)
-                    .header("Accept", "application/vnd.github+json")
-                    .header("User-Agent", USER_AGENT)
-                    .build()
-                http.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) return@withContext null
-                    val json = JSONObject(resp.body?.string() ?: return@withContext null)
-                    findApkAsset(json).first.takeIf { it.isNotBlank() }
-                }
-            } catch (t: Throwable) {
-                null
+    suspend fun resolveApkUrl(info: UpdateInfo): String? = withContext(Dispatchers.IO) {
+        // a tag vem da URL da release (o nome EXATO, com ou sem "v")
+        val tag = info.url.substringAfterLast("/releases/tag/", "").trim()
+        if (tag.isBlank()) return@withContext null
+        try {
+            val request = Request.Builder()
+                .url("$API_TAGS/$tag")
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", USER_AGENT)
+                .build()
+            http.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                val json = JSONObject(resp.body?.string() ?: return@withContext null)
+                findApkAsset(json).first.takeIf { it.isNotBlank() }
             }
+        } catch (t: Throwable) {
+            null
         }
+    }
 
     /** Acha o APK instalável entre os assets (TuneGrab-vX.apk — o -debug
      *  fica de fora). Devolve (url, tamanho em bytes). */

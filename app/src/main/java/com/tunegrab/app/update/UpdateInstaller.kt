@@ -127,10 +127,11 @@ object UpdateInstaller {
             try {
                 downloadTo(info.apkUrl, target, info, onProgress)
             } catch (notFound: Http404) {
-                val real = UpdateChecker.resolveApkUrl(context, info)
+                val real = UpdateChecker.resolveApkUrl(info)
                 if (real.isNullOrBlank() || real == info.apkUrl) throw notFound
                 downloadTo(real, target, info, onProgress)
             }
+            target
         } catch (t: Throwable) {
             target.delete()
             throw t
