@@ -37,6 +37,7 @@ import com.tunegrab.app.TuneGrabApp
 import com.tunegrab.app.databinding.FragmentHomeBinding
 import com.tunegrab.app.download.DownloadService
 import com.tunegrab.app.update.UpdateChecker
+import com.tunegrab.app.update.UpdateDownloadState
 import com.tunegrab.app.update.UpdateInstaller
 import com.tunegrab.app.yt.YtExtractor
 import com.tunegrab.app.yt.potoken.PoTokenManager
@@ -111,6 +112,14 @@ class HomeFragment : Fragment() {
         // cache/throttle de sempre (abertura fria consulta; falha é
         // silenciosa). Fora de listeners de ciclo: 1 consulta por criação
         // da aba, não 1 por frame de STARTED.
+        //
+        // v0.22.25: se JÁ HÁ um download do APK em andamento (o usuário trocou
+        // de aba no meio), o card reaparece IMEDIATAMENTE no ponto em que o
+        // download está — sem esperar a consulta de rede e sem voltar a 0%.
+        val emAndamento = UpdateDownloadState.info
+        if (emAndamento != null && (UpdateDownloadState.downloading || UpdateDownloadState.done)) {
+            showUpdateCard(emAndamento)
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             val info = UpdateChecker.check(requireContext())
             if (info != null && _binding != null) showUpdateCard(info)
@@ -984,16 +993,26 @@ class HomeFragment : Fragment() {
     }
 
     /** Texto/barra do card conforme o estado: "toque pra ver o que veio
-     *  de novo" → "Baixando… %" → "toque pra instalar". */
+     *  de novo" → "Baixando… %" → "toque pra instalar".
+     *
+     *  v0.22.25: o estado do download vem do [UpdateDownloadState] (escopo do
+     *  app), não só das variáveis do fragment — assim o card RECRIADO (troca
+     *  de aba) mostra o download no ponto em que ele está, em vez de voltar
+     *  pra 0%. */
     private fun refreshUpdateCard() {
         val b = _binding ?: return
         val info = updateInfo ?: return
         val ctx = context ?: return
+        // o download em andamento (se for desta release) manda no card
+        val st = UpdateDownloadState
+        val downloading = updateDownloading ||
+            (st.isCurrent(info) && st.downloading)
+        val percent = if (st.isCurrent(info)) maxOf(updatePercent, st.percent) else updatePercent
         when {
-            updateDownloading -> {
-                b.tvUpdateNotes.text = getString(R.string.upd_downloading, updatePercent)
+            downloading -> {
+                b.tvUpdateNotes.text = getString(R.string.upd_downloading, percent)
                 b.progressUpdate.isVisible = true
-                b.progressUpdate.progress = updatePercent
+                b.progressUpdate.progress = percent
                 b.btnCloseUpdate.isVisible = false
             }
             UpdateInstaller.isReady(ctx, info) -> {
@@ -1014,7 +1033,12 @@ class HomeFragment : Fragment() {
      *  [UpdateChecker.cleanNotes] limpa os símbolos da release). */
     private fun onUpdateCardTapped(info: UpdateChecker.UpdateInfo) {
         val ctx = context ?: return
-        if (updateDownloading) return
+        // v0.22.25: o "baixando" também vem do estado GLOBAL — no fragment
+        // recriado a variável local é false, e o toque abriria o diálogo
+        // "O que veio de novo?" por cima de um download em andamento.
+        if (updateDownloading ||
+            (UpdateDownloadState.isCurrent(info) && UpdateDownloadState.downloading)
+        ) return
         if (UpdateInstaller.isReady(ctx, info)) {
             installUpdate(info)
             return
@@ -1055,30 +1079,61 @@ class HomeFragment : Fragment() {
         }
     }
 
-    /** Baixa o APK pra pasta PRIVADA do app (Android/data/…/files/updates —
-     *  apagada junto com o TuneGrab na desinstalação) com % no card. */
+    /**
+     * Baixa o APK pra pasta PRIVADA do app (Android/data/…/files/updates —
+     * apagada junto com o TuneGrab na desinstalação) com % no card.
+     *
+     * v0.22.25 (bug do "card continua resetando"): o download rodava no
+     * `viewLifecycleOwner.lifecycleScope`, que é CANCELADO no onDestroyView —
+     * ou seja, na TROCA DE ABA. O download era abortado (e o arquivo
+     * apagado pelo catch do UpdateInstaller) e as variáveis do fragment
+     * morriam junto, então ao voltar o card nascia em 0%.
+     *
+     * Agora o download roda no ESCOPO DO APP (o mesmo da fila da playlist:
+     * trocar de aba não aborta) e o estado vive no
+     * [UpdateDownloadState] — fora do fragment — para o card recriado
+     * reaparecer no ponto em que o download está.
+     */
     private fun startUpdateDownload(info: UpdateChecker.UpdateInfo) {
         val ctx = context ?: return
+        UpdateDownloadState.begin(info)
+        updateInfo = info
         updateDownloading = true
         updatePercent = 0
         refreshUpdateCard()
-        viewLifecycleOwner.lifecycleScope.launch {
+        // escopo do APP: o fragment pode morrer (troca de aba) sem derrubar
+        // o download — o contexto do app é capturado UMA vez aqui.
+        TuneGrabApp.appScope.launch {
             try {
                 UpdateInstaller.download(ctx.applicationContext, info) { pct ->
-                    lifecycleScope.launch(Dispatchers.Main) {
-                        updatePercent = pct
-                        val b = _binding ?: return@launch
-                        b.progressUpdate.progress = pct
-                        b.tvUpdateNotes.text = getString(R.string.upd_downloading, pct)
+                    UpdateDownloadState.percent = pct
+                    // a UI só existe se o fragment ainda estiver vivo
+                    if (_binding != null) {
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            updatePercent = pct
+                            refreshUpdateCard()
+                        }
                     }
                 }
-                updateDownloading = false
-                refreshUpdateCard()
-                Toast.makeText(ctx, R.string.upd_ready_toast, Toast.LENGTH_SHORT).show()
+                UpdateDownloadState.downloading = false
+                UpdateDownloadState.done = true
+                if (_binding != null) {
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        updateDownloading = false
+                        refreshUpdateCard()
+                        Toast.makeText(ctx, R.string.upd_ready_toast, Toast.LENGTH_SHORT).show()
+                    }
+                }
             } catch (t: Throwable) {
-                updateDownloading = false
-                refreshUpdateCard()
-                Toast.makeText(ctx, R.string.upd_err_download, Toast.LENGTH_SHORT).show()
+                UpdateDownloadState.downloading = false
+                UpdateDownloadState.failed = true
+                if (_binding != null) {
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        updateDownloading = false
+                        refreshUpdateCard()
+                        Toast.makeText(ctx, R.string.upd_err_download, Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }

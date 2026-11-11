@@ -391,6 +391,7 @@ versão oficial.
 - [x] **Versão de teste do conserto do card do download, publicada como latest pra teste no aparelho** (v0.22.22)
 - [x] **Aviso de versão nova confiável: "Atualizar agora" consulta de verdade, o aviso dispensado não volta sozinho, a consulta usa o caminho sem limite de pedidos do GitHub e se auto-cura se o link do APK mudar** (v0.22.23)
 - [x] **Card do download: a barra não volta a ficar animada sem número na retomada, o item da fila não troca a tela e o diagnóstico registra o instante exato da troca de seção** (v0.22.24)
+- [x] **Download da atualização não desiste mais na troca de seção: o aviso de versão nova continua o download no escopo do app e reaparece no ponto em que parou** (v0.22.25)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

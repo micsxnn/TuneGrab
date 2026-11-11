@@ -1,21 +1,13 @@
-Versão de teste do card do download, de novo — agora com diagnóstico.
+O aviso de versão nova não desiste mais quando você troca de seção.
 
-Se o card ainda resetar quando você troca de seção, esta versão tem um
-registro que mostra exatamente o que aconteceu, pra eu não ficar
-adivinhando. É só o log do app, nada aparece na tela.
+O que acontecia: você tocava no aviso de versão nova, o app começava a
+baixar a atualização, aí você mexia em outra seção do app — e o download era
+interrompido. Quando você voltava, o aviso aparecia de novo do zero, como se
+tivesse começado a baixar agora.
 
-O que também foi arrumado nesta:
+Agora o download continua em paz. Você pode trocar de seção à vontade: o
+aviso volta no ponto em que parou, com a porcentagem certa. E, se a
+atualização já tiver baixado, ele aparece pronto pra instalar.
 
-- Quando o download volta a rodar depois de uma pausa ou de o sistema
-  liberar memória, a barrinha não volta mais a ficar animada sem número.
-  Ela continua mostrando a porcentagem real.
-- O item que entra na fila não troca mais o que já estava na tela.
-- Um aviso atrasado do download não embaralha mais o texto do card (ele
-  mostrava "Baixando" junto com "99%").
-
-Se ainda resetar, me manda o log que sai do comando:
-
-adb logcat -s TuneGrabCard TuneGrabBus TuneGrab
-
-Com ele eu vejo o instante exato em que o card mudou, e de onde veio a
-mudança.
+O aviso de "não troque de seção" não foi preciso: o problema foi consertado
+de verdade, então não tem mais nada pra pedir.
