@@ -1,13 +1,17 @@
-O aviso de versão nova não desiste mais quando você troca de seção.
+O player de vídeo ficou com movimento de verdade.
 
-O que acontecia: você tocava no aviso de versão nova, o app começava a
-baixar a atualização, aí você mexia em outra seção do app — e o download era
-interrompido. Quando você voltava, o aviso aparecia de novo do zero, como se
-tivesse começado a baixar agora.
+Antes, tudo aparecia e sumia de uma vez: os controles, o botão de play, o
+círculo de "carregando". Ficava seco, como se o app não quisesse o vídeo.
 
-Agora o download continua em paz. Você pode trocar de seção à vontade: o
-aviso volta no ponto em que parou, com a porcentagem certa. E, se a
-atualização já tiver baixado, ele aparece pronto pra instalar.
+Agora:
 
-O aviso de "não troque de seção" não foi preciso: o problema foi consertado
-de verdade, então não tem mais nada pra pedir.
+- Os controles entram e saem deslizando, com um leve zoom. O vídeo continua
+  ali, você só vê o que precisa na hora.
+- O botão de play gira quando vira pause, e vice-versa. Dá pra ver a troca.
+- Os botões de pular 10 segundos respondem ao toque, com um baque elástico.
+- A barra de progresso desliza em vez de dar saltos, e o tempo é exato.
+- O "carregando" aparece e some de leve, sem piscar.
+- O botão dourado do play ganhou brilho de verdade e sombra, e os números
+  dos botões de pular ficaram mais legíveis.
+
+Vale pros dois vídeos: o baixado e o que toca direto da rede.

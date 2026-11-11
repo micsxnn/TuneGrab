@@ -23,6 +23,9 @@ import android.util.Log
 import android.util.Rational
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.CompoundButton
 import android.widget.SeekBar
 import android.widget.Toast
@@ -159,7 +162,11 @@ class PlayerActivity : AppCompatActivity() {
     private val tick = object : Runnable {
         override fun run() {
             updatePosition()
-            tickHandler.postDelayed(this, 500)
+            // v0.22.26: no VÍDEO o tick é 5x mais rápido (100ms em vez de
+            // 500ms) — com a resolução da barra 10x maior, ela desliza
+            // contínua em vez de dar degraus. No ÁUDIO continua 500ms (a
+            // barra de áudio não precisa e o batente economiza bateria).
+            tickHandler.postDelayed(this, if (isVideo) VIDEO_TICK_MS else 500)
         }
     }
 
@@ -280,9 +287,20 @@ class PlayerActivity : AppCompatActivity() {
     private fun setupVideoControls() {
         val c = binding.videoControls
 
-        c.btnVideoPlay.setOnClickListener { toggleVideoPlayback() }
-        c.btnVideoBack10.setOnClickListener { seekVideoBy(-SEEK_STEP_MS) }
-        c.btnVideoForward10.setOnClickListener { seekVideoBy(SEEK_STEP_MS) }
+        // v0.22.26: cada botão dá um "pop" elástico ao toque — antes eram
+        // mudos (o dedo entrava e nada acontecia visivelmente).
+        c.btnVideoPlay.setOnClickListener {
+            popVideoButton(c.btnVideoPlay)
+            toggleVideoPlayback()
+        }
+        c.btnVideoBack10.setOnClickListener {
+            popVideoButton(c.btnVideoBack10)
+            seekVideoBy(-SEEK_STEP_MS)
+        }
+        c.btnVideoForward10.setOnClickListener {
+            popVideoButton(c.btnVideoForward10)
+            seekVideoBy(SEEK_STEP_MS)
+        }
 
         // a barra de progresso: arrastar não pode ser atropelado pelo tick
         c.videoSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -291,7 +309,7 @@ class PlayerActivity : AppCompatActivity() {
                 videoUserSeeking = true
                 val dur = videoDurationMs()
                 if (dur > 0) {
-                    c.videoPosition.text = formatMs((dur * progress / 1000).toInt())
+                    c.videoPosition.text = formatMs((dur * progress / VIDEO_SEEK_MAX).toInt())
                 }
             }
 
@@ -307,7 +325,7 @@ class PlayerActivity : AppCompatActivity() {
                 videoUserSeeking = false
                 val dur = videoDurationMs()
                 val progress = bar?.progress ?: 0
-                if (dur > 0) seekVideoTo((dur * progress / 1000).toInt())
+                if (dur > 0) seekVideoTo((dur * progress / VIDEO_SEEK_MAX).toInt())
                 // volta a valer o sumir-sozinho
                 scheduleHideVideoControls()
             }
@@ -338,7 +356,9 @@ class PlayerActivity : AppCompatActivity() {
             } catch (ignored: Throwable) {
             }
         }
-        refreshVideoPlayIcon()
+        // v0.22.26: o ícone "vira" (rotação + pop) — a troca de imagem
+        // instantânea era um dos pontos mais secos do player.
+        refreshVideoPlayIcon(animate = true)
         showVideoControls()
     }
 
@@ -427,30 +447,135 @@ class PlayerActivity : AppCompatActivity() {
         if (videoControlsVisible) hideVideoControls() else showVideoControls()
     }
 
-    /** Mostra os controles e marca o prazo de sumirem sozinhos. */
+    /**
+     * Mostra os controles e marca o prazo de sumirem sozinhos.
+     *
+     * v0.22.26: a entrada dos controles é ANIMADA (fade + escala) — antes
+     * eles apareciam de uma vez (visibility seco), que era o que deixava o
+     * player "seco".
+     */
     private fun showVideoControls() {
         if (!isVideo) return
         videoControlsVisible = true
-        binding.videoControls.videoCenterControls.visibility = View.VISIBLE
-        binding.videoControls.videoBottomBar.visibility = View.VISIBLE
-        binding.videoControls.videoScrim.visibility = View.VISIBLE
         // com os controles na tela, a camada de toque FICA desligada — os
         // botões e a barra recebem o toque direto (sem o "toggle" disparando
         // por baixo e escondendo tudo no primeiro toque)
         binding.videoTouchLayer.isClickable = false
+        animateVideoControls(true)
         refreshVideoPlayIcon()
         scheduleHideVideoControls()
     }
 
-    /** Esconde os controles (vídeo limpo na tela). */
+    /**
+     * Esconde os controles (vídeo limpo na tela).
+     *
+     * v0.22.26: a saída é ANIMADA (fade + encolhe) — nada de sumir de golpe.
+     */
     private fun hideVideoControls() {
         videoControlsVisible = false
-        binding.videoControls.videoCenterControls.visibility = View.GONE
-        binding.videoControls.videoBottomBar.visibility = View.GONE
-        binding.videoControls.videoScrim.visibility = View.GONE
+        animateVideoControls(false)
         // sem controles na tela, a camada de toque volta a capturar o toque
         // (um toque em qualquer lugar traz os controles de volta)
         binding.videoTouchLayer.isClickable = true
+    }
+
+    /**
+     * v0.22.26: entrada e SAÍDA animadas dos controles de vídeo.
+     *
+     * Entrada: os botões do centro aparecem um pouco menores (0.88) e a
+     * barra sobe um pouco — tudo com fade. Saída: o inverso, e as vistas só
+     * viram GONE no FIM da animação (senão o sumir seria instantâneo).
+     *
+     * CORRIDA (toque rápido): o "withEndAction" da saída checa o
+     * `videoControlsVisible` — se o usuário já pediu pra mostrar de novo, a
+     * flag está true e a view NÃO é escondida. É o que impede os controles
+     * de sumirem no meio de uma animação de entrada.
+     */
+    private fun animateVideoControls(show: Boolean) {
+        val c = binding.videoControls
+        val scrim = c.videoScrim
+        val center = c.videoCenterControls
+        val bottom = c.videoBottomBar
+
+        // a animação anterior é cancelada (toque rápido não deve brigar)
+        scrim.animate().cancel()
+        center.animate().cancel()
+        bottom.animate().cancel()
+
+        // a subida da barra é em PIXELS (translationY), não em dp
+        val rise = dp(24).toFloat()
+
+        if (show) {
+            listOf(scrim, center, bottom).forEach { v ->
+                if (v.visibility != View.VISIBLE) {
+                    v.visibility = View.VISIBLE
+                    v.alpha = 0f
+                }
+            }
+            // o estado de partida da animação de entrada
+            center.scaleX = 0.88f
+            center.scaleY = 0.88f
+            bottom.translationY = rise
+
+            scrim.animate()
+                .alpha(1f)
+                .setDuration(VIDEO_FADE_MS)
+                .start()
+            center.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(VIDEO_FADE_MS)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+            bottom.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(VIDEO_FADE_MS)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        } else {
+            scrim.animate()
+                .alpha(0f)
+                .setDuration(VIDEO_FADE_MS)
+                .start()
+            center.animate()
+                .alpha(0f)
+                .scaleX(0.88f)
+                .scaleY(0.88f)
+                .setDuration(VIDEO_FADE_MS)
+                .setInterpolator(AccelerateInterpolator())
+                .withEndAction {
+                    if (!videoControlsVisible) center.visibility = View.GONE
+                }
+                .start()
+            bottom.animate()
+                .alpha(0f)
+                .translationY(rise)
+                .setDuration(VIDEO_FADE_MS)
+                .setInterpolator(AccelerateInterpolator())
+                .withEndAction {
+                    if (!videoControlsVisible) bottom.visibility = View.GONE
+                }
+                .start()
+        }
+    }
+
+    /**
+     * v0.22.26: "pop" elástico no botão tocado — devolve a sensação de
+     * toque (antes os botões eram mudos: o dedo entrava e nada acontecia
+     * visivelmente).
+     */
+    private fun popVideoButton(view: View) {
+        view.animate().cancel()
+        view.scaleX = 0.82f
+        view.scaleY = 0.82f
+        view.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(VIDEO_POP_MS)
+            .setInterpolator(OvershootInterpolator(3f))
+            .start()
     }
 
     /** some sozinho depois de 3,5s de o vídeo tocar sem toque */
@@ -463,35 +588,68 @@ class PlayerActivity : AppCompatActivity() {
         tickHandler.postDelayed(job, VIDEO_CONTROLS_TIMEOUT_MS)
     }
 
-    /** Ícone do botão grande: play ou pause (acompanha o estado real). */
-    private fun refreshVideoPlayIcon() {
+    /**
+     * Ícone do botão grande: play ou pause (acompanha o estado real).
+     *
+     * v0.22.26: quando o estado muda por TOQUE, o ícone "vira" (rotação de
+     * 90° + pop elástico) em vez de trocar de golpe. É o gesto que o autor
+     * estranhava — o botão mudava de imagem sem nenhuma transição.
+     */
+    private fun refreshVideoPlayIcon(animate: Boolean = false) {
         if (!isVideo) return
         val playing = isVideoPlaying()
         val icon = if (playing) R.drawable.ic_pause else R.drawable.ic_play
         val btn = binding.videoControls.btnVideoPlay
         if (btn.tag != icon) {
             btn.tag = icon
-            btn.setImageResource(icon)
             btn.contentDescription = getString(
                 if (playing) R.string.player_pause else R.string.player_play
             )
+            if (animate) {
+                btn.animate().cancel()
+                // parte de um ângulo e de um tamanho menor: o ícone "gira"
+                // pra dentro da posição final
+                btn.rotation = if (playing) -90f else 90f
+                btn.scaleX = 0.72f
+                btn.scaleY = 0.72f
+                btn.setImageResource(icon)
+                btn.animate()
+                    .rotation(0f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(VIDEO_ICON_MS)
+                    .setInterpolator(OvershootInterpolator(2f))
+                    .start()
+            } else {
+                btn.setImageResource(icon)
+                btn.rotation = 0f
+            }
         }
     }
 
-    /** Atualiza a barra de progresso e os tempos (chamado pelo tick). */
+    /**
+     * Atualiza a barra de progresso e os tempos (chamado pelo tick).
+     *
+     * v0.22.26: o tick do vídeo roda a 100ms (barra deslizando) — então os
+     * TEXTOS só são reescritos quando o valor muda de verdade. Sem isso
+     * seriam 10 strings novas por segundo, à toa.
+     */
     private fun updateVideoControls() {
         if (!isVideo) return
         val c = binding.videoControls
         val dur = videoDurationMs()
         if (dur > 0) {
-            c.videoDuration.text = formatMs(dur)
+            val durText = formatMs(dur)
+            if (c.videoDuration.text != durText) c.videoDuration.text = durText
         }
         if (!videoUserSeeking) {
             val pos = videoPositionMs()
             if (dur > 0) {
-                c.videoSeekBar.progress = ((pos.toLong() * 1000) / dur).toInt().coerceIn(0, 1000)
+                c.videoSeekBar.progress =
+                    ((pos.toLong() * VIDEO_SEEK_MAX) / dur).toInt().coerceIn(0, VIDEO_SEEK_MAX)
             }
-            c.videoPosition.text = formatMs(pos)
+            val posText = formatMs(pos)
+            if (c.videoPosition.text != posText) c.videoPosition.text = posText
         }
         refreshVideoPlayIcon()
     }
@@ -644,9 +802,32 @@ class PlayerActivity : AppCompatActivity() {
         binding.playerView.player = exoPlayer
     }
 
-    /** Spinner "carregando…" centralizado (só existe no stream remoto). */
+    /**
+     * Spinner "carregando…" centralizado (só existe no stream remoto).
+     *
+     * v0.22.26: o spinner entra e sai com FADE — antes ele aparecia e
+     * sumia de golpe, o que ficava mais "seco" ainda do que os controles.
+     */
     private fun showBuffering(on: Boolean) {
-        binding.progressBuffer.visibility = if (on) View.VISIBLE else View.GONE
+        val v = binding.progressBuffer
+        v.animate().cancel()
+        if (on) {
+            if (v.visibility != View.VISIBLE) {
+                v.alpha = 0f
+                v.visibility = View.VISIBLE
+            }
+            v.animate().alpha(1f).setDuration(VIDEO_FADE_MS).start()
+        } else {
+            v.animate()
+                .alpha(0f)
+                .setDuration(VIDEO_FADE_MS)
+                .withEndAction {
+                    // só some se ainda estiver escondido (o buffering pode ter
+                    // voltado enquanto a animação corria)
+                    if (v.alpha == 0f) v.visibility = View.GONE
+                }
+                .start()
+        }
     }
 
     /**
@@ -1410,6 +1591,18 @@ class PlayerActivity : AppCompatActivity() {
         private const val SEEK_STEP_MS = 10_000
         /** Os controles somem sozinhos depois deste tempo sem toque. */
         private const val VIDEO_CONTROLS_TIMEOUT_MS = 3_500L
+
+        // v0.22.26: as animações dos controles de vídeo
+        /** Duração do fade de entrada/saída dos controles (ms). */
+        private const val VIDEO_FADE_MS = 180L
+        /** Duração do "pop" elástico dos botões ao toque (ms). */
+        private const val VIDEO_POP_MS = 280L
+        /** Duração do giro/pop do ícone play<->pause (ms). */
+        private const val VIDEO_ICON_MS = 300L
+        /** Intervalo do tick no VÍDEO (ms) — barra deslizando suave. */
+        private const val VIDEO_TICK_MS = 100L
+        /** Resolução da barra de progresso do vídeo (10x a de antes). */
+        private const val VIDEO_SEEK_MAX = 10_000
 
         const val EXTRA_TITLE = "title"
         const val EXTRA_IS_VIDEO = "is_video"

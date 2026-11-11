@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Botão circular SEMI-TRANSLÚCIDO dos controles de vídeo (v0.22.20):
-     fundo escuro suave pra o ícone claro destacar em cima de QUALQUER cena
-     do vídeo (sem depender da cor da imagem). O android:alpha do botão
-     cuida da leveza; o shape é o disco. -->
+<!-- Botão circular dos controles laterais de vídeo (v0.22.26): fundo
+     escuro com leve gradiente (mais claro no topo) pra dar volume ao disco
+     em vez do preto chapado. O scrim atrás dos controles garante o
+     contraste do ícone em qualquer cena do vídeo. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="#66000000" />
+    <gradient
+        android:angle="270"
+        android:centerColor="#7A000000"
+        android:endColor="#59000000"
+        android:startColor="#8C000000"
+        android:type="linear" />
 </shape>

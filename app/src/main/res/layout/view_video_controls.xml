@@ -65,6 +65,7 @@
             android:layout_height="52dp"
             android:background="@drawable/bg_video_control_circle"
             android:contentDescription="@string/player_seek_back"
+            android:elevation="4dp"
             android:padding="12dp"
             android:src="@drawable/ic_replay_10"
             app:tint="@color/on_background" />
@@ -78,6 +79,7 @@
             android:layout_marginEnd="20dp"
             android:background="@drawable/bg_video_play_circle"
             android:contentDescription="@string/player_play"
+            android:elevation="8dp"
             android:padding="19dp"
             android:src="@drawable/ic_play"
             app:tint="@color/background" />
@@ -89,6 +91,7 @@
             android:layout_height="52dp"
             android:background="@drawable/bg_video_control_circle"
             android:contentDescription="@string/player_seek_forward"
+            android:elevation="4dp"
             android:padding="12dp"
             android:src="@drawable/ic_forward_10"
             app:tint="@color/on_background" />
@@ -107,11 +110,14 @@
         android:visibility="gone"
         tools:visibility="visible">
 
+        <!-- v0.22.26: max = 10000 (resolução 10x melhor) — com o tick do
+             vídeo a 100ms a barra desliza CONTINUÁUA em vez de dar degraus
+             de meio por cento a cada meio segundo. -->
         <SeekBar
             android:id="@+id/videoSeekBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:max="1000"
+            android:max="10000"
             android:progressDrawable="@drawable/bg_video_progress"
             android:thumbTint="@color/primary" />
 
