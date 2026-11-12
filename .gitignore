@@ -7,3 +7,7 @@ build/
 /captures
 .externalNativeBuild
 .cxx
+
+# Python (gerador da arte animada)
+__pycache__/
+*.pyc

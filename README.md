@@ -6,6 +6,8 @@
 
 **Baixe músicas e vídeos do YouTube no Android. O download roda inteiro no seu aparelho, sem servidor intermediário e sem anúncios.**
 
+<img src="docs/player-demo.gif" width="520" alt="Player de vídeo do TuneGrab em movimento: os controles entram deslizando, o botão de play gira ao virar pause, os botões de pular 10 segundos respondem ao toque e a barra de progresso desliza"/>
+
 [![Build](https://github.com/micsxnn/TuneGrab/actions/workflows/build.yml/badge.svg)](https://github.com/micsxnn/TuneGrab/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/micsxnn/TuneGrab)](https://github.com/micsxnn/TuneGrab/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/micsxnn/TuneGrab/total)](https://github.com/micsxnn/TuneGrab/releases)
@@ -118,6 +120,12 @@ favoritos, e o restante da coleção se organiza em pastas.
   `youtu.be`, Shorts e playlists
 
 ### Player
+
+<p align="center">
+  <img src="docs/player-demo.gif" width="560" alt="Player de vídeo do TuneGrab em movimento: os controles entram deslizando, o play gira ao virar pause, os botões de 10 segundos respondem ao toque e a barra desliza"/>
+</p>
+
+<p align="center"><sub>Os controles do vídeo são próprios do app: entram e saem deslizando, o botão de play gira ao virar pause, os botões de pular 10 segundos respondem ao toque e a barra de progresso desliza sem saltos.</sub></p>
 
 - **Player embutido** com barra de progresso e **espectro de áudio real**, cujas
   barras acompanham o som sem exigir permissão extra. A thumbnail entra
