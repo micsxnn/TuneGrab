@@ -39,10 +39,10 @@ object LyricsLrc {
         if ('&' !in raw) return raw
         var out = raw
         out = out.replace(Regex("&#x([0-9a-fA-F]+);")) {
-            runCatching { it.groupValues[1].toInt(16).toChar().toString() }.getOrDefault(it.value)
+            codePointToString { it.groupValues[1].toInt(16) }.getOrDefault(it.value)
         }
         out = out.replace(Regex("&#(\\d+);")) {
-            runCatching { it.groupValues[1].toInt().toChar().toString() }.getOrDefault(it.value)
+            codePointToString { it.groupValues[1].toInt() }.getOrDefault(it.value)
         }
         // O "&" fica numa constante: escrever "&" direto no código
         // vira "&" quando o arquivo passa por um filtro de HTML.
@@ -55,6 +55,14 @@ object LyricsLrc {
             .replace(AMP + "amp;", AMP)
         return out
     }
+
+    /**
+     * Code point → texto. `Int.toChar()` cortava em 16 bits e estragava emoji
+     * (`&#128512;`); `Character.toChars` gera o par substituto certo. Valor
+     * fora do Unicode vira falha e a entidade fica como veio.
+     */
+    private inline fun codePointToString(codePoint: () -> Int): Result<String> =
+        runCatching { String(Character.toChars(codePoint())) }
 
     /** `mm:ss`, `mm:ss.xx` ou `mm:ss.xxx` → milissegundos. */
     private fun stampToMs(minutes: Long, seconds: Long, fractionStr: String): Long {
