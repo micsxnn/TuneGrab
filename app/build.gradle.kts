@@ -29,19 +29,20 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("keystore/tunegrab.keystore")
-            storePassword = "tunegrab2025"
-            keyAlias = "tunegrab"
-            keyPassword = "tunegrab2025"
-        }
-    }
-
+    // A assinatura do release NÃO mora mais no código: o APK sai sem assinar daqui
+    // e o CI assina com o apksigner (chave + linhagem de rotação vêm dos Secrets
+    // do GitHub). Veja docs/SIGNING.md. Debug continua com a chave de debug padrão.
     buildTypes {
         release {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // R8 só no modo ENCOLHER (tree-shaking): sem ofuscar e sem otimizar,
+            // porque o app depende de reflexão (yt-dlp, NewPipe, Ktor, Jackson).
+            // As regras estão em proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -88,6 +89,14 @@ android {
 
     lint {
         abortOnError = false
+    }
+
+    testOptions {
+        unitTests {
+            // android.util.Log etc. devolvem valor padrão em vez de explodir
+            // nos testes de JVM (a lógica testada é pura, isto é só rede de segurança).
+            isReturnDefaultValues = true
+        }
     }
 }
 
@@ -192,4 +201,11 @@ dependencies {
 
     // Parser HTML — raspagem das fontes de letra (Genius).
     implementation("org.jsoup:jsoup:1.18.3")
+}
+
+// Testes de unidade (JVM, sem aparelho): lógica pura do app.
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    // O org.json do android.jar é só um stub nos testes de JVM.
+    testImplementation("org.json:json:20240303")
 }
