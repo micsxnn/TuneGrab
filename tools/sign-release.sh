@@ -33,6 +33,9 @@ NEW_FP="$(fingerprint "$WORK/new.p12" NEW_KEYSTORE_PASS)"
 [[ "$OLD_FP" =~ ^[0-9a-f]{64}$ && "$NEW_FP" =~ ^[0-9a-f]{64}$ && "$OLD_FP" != "$NEW_FP" ]] || {
   echo 'Invalid or identical signing certificates'; exit 1;
 }
+# Public fingerprints independently checked against the official old APK and the existing migration artifact.
+[[ "$OLD_FP" == "092f92927585924b3825d9fb5814ec445e10cbeabc6330ad841702bb45954261" ]] || { echo 'Unexpected legacy signing identity'; exit 1; }
+[[ "$NEW_FP" == "40ccf31b39211291c1172332e041aa8ec73c126a7b99df445e064fcd2d53a865" ]] || { echo 'Unexpected current signing identity; explicit migration required'; exit 1; }
 "$BT/apksigner" rotate --out "$WORK/lineage" \
   --old-signer --ks "$WORK/old.p12" --ks-key-alias "$ALIAS" \
     --ks-pass env:OLD_KEYSTORE_PASS --key-pass env:OLD_KEYSTORE_PASS --set-rollback false \
@@ -48,18 +51,19 @@ SIGNED="$DIR/TuneGrab-v$VERSION.apk"
   --lineage "$WORK/lineage" --rotation-min-sdk-version 33 \
   --out "$SIGNED" "$WORK/aligned.apk"
 "$BT/apksigner" verify --verbose "$SIGNED"
-cert() {
-  "$BT/apksigner" verify --print-certs --min-sdk-version "$1" --max-sdk-version "$2" "$SIGNED" \
-    | awk '/certificate SHA-256 digest/ {print tolower($NF)}'
-}
-check() {
-  local actual; actual="$(cert "$1" "$2")"
-  [[ "$actual" == "$3" ]] || { echo "Incorrect certificate for API $1-$2"; exit 1; }
-  echo "Verified certificate for API $1-$2: $actual"
-}
-check 24 27 "$OLD_FP"
-check 28 32 "$OLD_FP"
-check 33 99 "$NEW_FP"
+# apksigner --print-certs lists BOTH SDK-targeted signers for v3.1, even with --min-sdk-version.
+# Use the structured verifier and check the embedded lineage/capabilities too.
+javac -cp "$BT/lib/apksigner.jar" -d "$WORK" tools/VerifySigning.java
+java -cp "$WORK:$BT/lib/apksigner.jar" VerifySigning "$SIGNED" "$OLD_FP" "$NEW_FP" "$WORK/lineage"
+"$BT/aapt" dump badging "$SIGNED" > "$WORK/apk-info.txt"
+python3 - "$WORK/apk-info.txt" "$VERSION" <<'PY_VERIFY_APK'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+package = re.search(r"^package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", text, re.M)
+assert package and package[1] == "com.tunegrab.app" and package[3] == sys.argv[2], "Unexpected APK identity/version"
+assert "application-debuggable" not in text, "Production APK must not be debuggable"
+print("Verified APK package, version and non-debuggable flag.")
+PY_VERIFY_APK
 cp "$WORK/lineage" "$DIR/signing.lineage"
 {
   printf 'Legacy certificate SHA-256 (Android 7-12): %s\n' "$OLD_FP"

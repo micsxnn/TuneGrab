@@ -22,6 +22,17 @@ class TtmlParserSecurityTest {
         assertTrue(TtmlParser.parse(xml).isEmpty())
     }
 
+    @Test fun excessive_nesting_is_rejected_before_recursive_word_collection() {
+        val xml = "<tt><body><p begin=\"1s\">" + "<span>".repeat(128) + "Hello" +
+            "</span>".repeat(128) + "</p></body></tt>"
+        assertTrue(TtmlParser.parse(xml).isEmpty())
+    }
+
+    @Test fun too_many_elements_are_rejected_before_dom_allocation() {
+        val xml = "<tt><body><p begin=\"1s\">" + "<span>x</span>".repeat(33_000) + "</p></body></tt>"
+        assertTrue(TtmlParser.parse(xml).isEmpty())
+    }
+
     @Test fun oversized_xml_is_rejected_before_dom_allocation() {
         assertTrue(TtmlParser.parse(verse + " ".repeat(2 * 1024 * 1024)).isEmpty())
     }

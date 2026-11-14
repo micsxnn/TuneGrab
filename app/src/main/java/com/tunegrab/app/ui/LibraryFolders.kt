@@ -12,6 +12,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.tunegrab.app.download.SaveLocation
+import com.tunegrab.app.security.StoragePaths
 import java.io.File
 
 /**
@@ -119,14 +120,14 @@ object LibraryFolders {
         val prefix = "${Environment.DIRECTORY_DOWNLOADS}/$ROOT_NAME"
         if (clean == prefix) return ""
         if (!clean.startsWith("$prefix/")) return null
-        return clean.removePrefix("$prefix/")
+        return clean.removePrefix("$prefix/").takeIf(StoragePaths::isKey)
     }
 
     /** Chave de navegação do PAI de um arquivo java.io.File sob a raiz
      *  padrão. Fora da raiz → null (ex.: Music/TuneGrab). */
     fun fileToKey(f: File): String? {
-        val rootPath = defaultRoot().absolutePath.trimEnd('/')
-        val parent = f.parentFile?.absolutePath?.trimEnd('/') ?: return null
+        val rootPath = defaultRoot().canonicalPath.trimEnd('/')
+        val parent = f.parentFile?.canonicalPath?.trimEnd('/') ?: return null
         if (parent == rootPath) return ""
         if (!parent.startsWith("$rootPath/")) return null
         return parent.removePrefix("$rootPath/")
@@ -140,14 +141,14 @@ object LibraryFolders {
         val docId = DocumentsContract.getDocumentId(docUri)
         if (docId == rootId) ""
         else if (docId.startsWith("$rootId/"))
-            docId.removePrefix("$rootId/").substringBeforeLast('/')
+            docId.removePrefix("$rootId/").substringBeforeLast('/', "").takeIf(StoragePaths::isKey)
         else null
     } catch (t: Throwable) {
         null
     }
 
     private fun joinKey(parent: String, name: String): String =
-        if (parent.isBlank()) name else "$parent/$name"
+        if (parent.isEmpty()) name else "$parent/$name"
 
     /**
      * Sanitiza o nome digitado: espaços colapsados, sem "/" nem "\", sem
@@ -157,7 +158,7 @@ object LibraryFolders {
     fun sanitize(raw: String): String? {
         val n = raw.replace(Regex("\\s+"), " ").trim()
         if (n.isEmpty() || n.length > 80) return null
-        if (n.contains('/') || n.contains('\\')) return null
+        if (!StoragePaths.isName(n)) return null
         if (n.startsWith(".")) return null
         return n
     }
@@ -172,6 +173,7 @@ object LibraryFolders {
      * alcança). No destino SAF: só o DocumentFile (a pasta de verdade).
      */
     fun listChildren(ctx: Context, key: String, all: List<LibraryEntry>): List<LibFolder> {
+        if (!StoragePaths.isKey(key)) return emptyList()
         val names = LinkedHashSet<String>()
         try {
             if (isCustomTree(ctx)) {
@@ -225,6 +227,7 @@ object LibraryFolders {
     private fun walkFile(dir: File, key: String, acc: MutableSet<String>) {
         dir.listFiles()?.filter { it.isDirectory && !it.name.startsWith(".") }?.forEach { child ->
             val childKey = joinKey(key, child.name)
+            if (StoragePaths.resolve(defaultRoot(), childKey) == null || childKey in acc) return@forEach
             acc.add(childKey)
             walkFile(child, childKey, acc)
         }
@@ -233,6 +236,7 @@ object LibraryFolders {
     private fun walkDoc(dir: DocumentFile, key: String, acc: MutableSet<String>) {
         dir.listFiles().filter { it.isDirectory && !it.name.isNullOrBlank() }.forEach { child ->
             val childKey = joinKey(key, child.name!!)
+            if (!StoragePaths.isKey(childKey) || childKey in acc) return@forEach
             acc.add(childKey)
             walkDoc(child, childKey, acc)
         }
@@ -266,7 +270,7 @@ object LibraryFolders {
                 // [""] e a raiz entrava como "pasta" de chave vazia — linha
                 // SEM NOME no diálogo de mover (micaelsan: "tem uma pasta sem
                 // nome nas minhas pastas"). A raiz não é pasta: não entra.
-                if (k.isBlank()) continue
+                if (k.isEmpty()) continue
                 // "A/B" implica que "A" existe: a cadeia de pais entra junto
                 val segs = k.split('/')
                 var acc = ""
@@ -286,7 +290,7 @@ object LibraryFolders {
      *  cheia ("A/B" sob "A" → "A/B"). Não-descendente → null. */
     private fun childOf(parent: String, key: String): String? = when {
         key == parent -> null
-        parent.isBlank() -> key
+        parent.isEmpty() -> key
         key.startsWith("$parent/") -> key.removePrefix("$parent/")
         else -> null
     }
@@ -299,6 +303,7 @@ object LibraryFolders {
     /** Cria a pasta DE VERDADE dentro de `parentKey`. Nome repetido → Exists
      *  (nunca "pasta (1)" — a pasta é da pessoa, o nome é dela). */
     fun create(ctx: Context, parentKey: String, rawName: String): CreateResult {
+        if (!StoragePaths.isKey(parentKey)) return CreateResult.Invalid
         val name = sanitize(rawName) ?: return CreateResult.Invalid
         return try {
             if (isCustomTree(ctx)) {
@@ -320,21 +325,14 @@ object LibraryFolders {
 
     // ---------- navegação ----------
 
-    private fun navigateFile(root: File, key: String): File? {
-        var dir: File = root
-        if (key.isNotBlank()) {
-            for (seg in key.split('/')) {
-                dir = File(dir, seg)
-                if (!dir.isDirectory) return null
-            }
-        }
-        return if (dir.isDirectory) dir else null
-    }
+    private fun navigateFile(root: File, key: String): File? =
+        StoragePaths.resolve(root, key)?.takeIf { it.isDirectory }
 
     private fun navigateDoc(ctx: Context, key: String): DocumentFile? {
+        if (!StoragePaths.isKey(key)) return null
         var dir = SaveLocation.customTree(ctx)
             ?.let { DocumentFile.fromTreeUri(ctx, it) } ?: return null
-        if (key.isNotBlank()) {
+        if (key.isNotEmpty()) {
             for (seg in key.split('/')) {
                 dir = dir.findFile(seg)?.takeIf { it.isDirectory } ?: return null
             }
@@ -351,7 +349,7 @@ object LibraryFolders {
      * "same" antes de chamar). Falha honesta = false (a UI avisa).
      */
     fun move(ctx: Context, e: LibraryEntry, targetKey: String): Boolean {
-        if (!e.fromTuneGrab) return false
+        if (!e.fromTuneGrab || !StoragePaths.isName(e.name) || !StoragePaths.isKey(targetKey)) return false
         if (e.folder == targetKey) return true
         return try {
             if (e.docUri != null && isCustomTree(ctx)) moveViaSaf(ctx, e, targetKey)
@@ -389,6 +387,7 @@ object LibraryFolders {
      * índice não segue chave com segmento vazio — renomear resolve).
      */
     fun moveFolder(ctx: Context, key: String, targetKey: String): MoveFolderResult {
+        if (!StoragePaths.isKey(key) || !StoragePaths.isKey(targetKey)) return MoveFolderResult.Invalid
         if (key.isEmpty()) return MoveFolderResult.Failed // a raiz nunca
         if (targetKey == key) return MoveFolderResult.Same
         if (targetKey.startsWith("$key/")) return MoveFolderResult.Invalid
@@ -415,7 +414,7 @@ object LibraryFolders {
                     mediaStoreCountUnder(ctx, relOf(newKey)) > 0
                 ) return MoveFolderResult.Exists
                 val targetParent = navigateFile(root, targetKey)
-                    ?: File(root, targetKey).takeIf { it.isDirectory || it.mkdirs() }
+                    ?: StoragePaths.resolve(root, targetKey)?.takeIf { it.isDirectory || it.mkdirs() }
                     ?: return MoveFolderResult.Failed
                 val dir = navigateFile(root, key)
                 if (dir?.isDirectory != true) return MoveFolderResult.Failed
@@ -457,7 +456,7 @@ object LibraryFolders {
         // pasta de destino: pode ter sido apagada por outro app — recriar é
         // honesto (a pessoa pediu pra mover PRA DENTRO dela)
         val targetDir = navigateFile(root, targetKey)
-            ?: File(root, targetKey).takeIf { it.isDirectory || it.mkdirs() }
+            ?: StoragePaths.resolve(root, targetKey)?.takeIf { it.isDirectory || it.mkdirs() }
             ?: return false
 
         val source: File? = when {
@@ -491,7 +490,7 @@ object LibraryFolders {
         val uri = e.mediaUri ?: return false
         if (Build.VERSION.SDK_INT < 30) return false
         val base = "${Environment.DIRECTORY_DOWNLOADS}/$ROOT_NAME"
-        val newRel = if (targetKey.isBlank()) "$base/" else "$base/$targetKey/"
+        val newRel = if (targetKey.isEmpty()) "$base/" else "$base/$targetKey/"
         return try {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.RELATIVE_PATH, newRel)
@@ -531,7 +530,7 @@ object LibraryFolders {
      *  TuneGrab/Foo/" — SEMPRE com barra no fim (é o formato do índice). */
     private fun relOf(key: String): String =
         "${Environment.DIRECTORY_DOWNLOADS}/$ROOT_NAME" +
-            if (key.isBlank()) "/" else "/$key/"
+            if (key.isEmpty()) "/" else "/$key/"
 
     /**
      * RENOMEAR PASTA (v0.22.3) — micaelsan: "eu não consigo deletar pastas
@@ -546,6 +545,7 @@ object LibraryFolders {
      * SAF: renameTo do DocumentFile (renameDocument do provider).
      */
     fun renameFolder(ctx: Context, key: String, rawNewName: String): RenameResult {
+        if (!StoragePaths.isKey(key)) return RenameResult.Invalid
         // v0.22.4: isEmpty (só a raiz) — pasta de nome em branco agora RENOMEIA
         if (key.isEmpty()) return RenameResult.Failed // a raiz não tem nome
         val newName = sanitize(rawNewName) ?: return RenameResult.Invalid
@@ -610,7 +610,7 @@ object LibraryFolders {
         // v0.22.4: SÓ a chave VAZIA é a raiz (isEmpty). isBlank pegava também
         // pasta de nome em branco (criada fora do app) — e aí a pasta-fantasma
         // era intocável: "a raiz nunca" pra quem NÃO é raiz.
-        if (key.isEmpty()) return DeleteResult(0, 1) // a raiz nunca
+        if (key.isEmpty() || !StoragePaths.isKey(key)) return DeleteResult(0, 1) // a raiz nunca
         val acc = IntArray(2) // [apagados, falhados]
         try {
             if (isCustomTree(ctx)) {
@@ -652,6 +652,8 @@ object LibraryFolders {
     private fun wipeFile(dir: File, acc: IntArray) {
         val children = dir.listFiles() ?: return
         for (child in children) {
+            val relative = child.absolutePath.removePrefix(defaultRoot().canonicalPath.trimEnd('/') + "/")
+            if (StoragePaths.resolve(defaultRoot(), relative) == null) { acc[1]++; continue }
             if (child.isDirectory) {
                 wipeFile(child, acc)
                 child.delete()

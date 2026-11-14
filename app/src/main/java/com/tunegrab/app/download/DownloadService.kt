@@ -571,7 +571,7 @@ class DownloadService : Service() {
                 checkStop()
 
                 showPhase(fileName, getString(R.string.notif_phase_save), 99, indeterminate = true)
-                publish(mp3.inputStream().buffered(), mp3.length(), fileName, "audio/mpeg")
+                publish(mp3, fileName, "audio/mpeg")
             } else {
                 val parts = File(applicationContext.cacheDir, "parts").apply { mkdirs() }
                 val part = File(parts, "$fileName.${legacyUrl.hashCode().toString(36)}.part")
@@ -594,7 +594,7 @@ class DownloadService : Service() {
                 checkStop()
 
                 showPhase(fileName, getString(R.string.notif_phase_save), 99, indeterminate = true)
-                publish(part.inputStream().buffered(), part.length(), fileName, mime)
+                publish(part, fileName, mime)
             }
             notifyFinished(title, fileName, savedUri)
         } catch (e: DownloadPaused) {
@@ -738,7 +738,7 @@ class DownloadService : Service() {
                 "mkv" -> "video/x-matroska"
                 else -> "application/octet-stream"
             }
-            val saved = publish(produced.inputStream().buffered(), produced.length(), finalName, finalMime)
+            val saved = publish(produced, finalName, finalMime)
             return saved to qualityNote
         } finally {
             // pausa preserva os parciais no dir estável para a retomada continuar;
@@ -933,8 +933,7 @@ class DownloadService : Service() {
 
     /** Publica o arquivo final: na pasta escolhida (se houver) ou em Downloads/TuneGrab. */
     private fun publish(
-        input: InputStream,
-        total: Long,
+        source: File,
         fileName: String,
         mime: String,
         onProgress: (Long) -> Unit = {}
@@ -944,15 +943,14 @@ class DownloadService : Service() {
         val tree = SaveLocation.customTree(applicationContext)
         if (tree != null) {
             try {
-                return saveToTree(input, tree, fileName, mime, onProgress)
+                return source.inputStream().buffered().use { saveToTree(it, tree, fileName, mime, onProgress) }
             } catch (e: Exception) {
                 Log.w(TAG, "Falha ao salvar na pasta escolhida; usando o padrão", e)
             }
         }
-        return if (Build.VERSION.SDK_INT >= 29) {
-            saveViaMediaStore(input, fileName, mime, onProgress)
-        } else {
-            saveLegacy(input, fileName, onProgress)
+        return source.inputStream().buffered().use { input ->
+            if (Build.VERSION.SDK_INT >= 29) saveViaMediaStore(input, fileName, mime, onProgress)
+            else saveLegacy(input, fileName, onProgress)
         }
     }
 

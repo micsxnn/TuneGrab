@@ -18,6 +18,7 @@ concurrency:
 jobs:
   build:
     name: Test and build unsigned APK
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,13 +35,15 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Invitation generator self-test
-        run: python3 tools/passgen.py --selftest
+        run: |
+          python3 tools/passgen.py --selftest
+          python3 -m unittest discover -s tools -p 'test_passgen.py'
       - name: Native JNI regression tests
         run: bash tools/test-native.sh
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --write-verification-metadata sha256 --stacktrace
       - name: Build release APK
-        run: ./gradlew assembleRelease --write-verification-metadata sha256 --stacktrace
+        run: ./gradlew assembleRelease securityRuntimeDependencies --write-verification-metadata sha256 --stacktrace
       - name: Export dependency verification bootstrap
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -56,6 +59,7 @@ jobs:
           path: |
             app/build/reports/tests/
             app/build/test-results/
+            app/build/reports/security/
           if-no-files-found: ignore
       - name: Upload unsigned build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -67,6 +71,7 @@ jobs:
 
   sign:
     name: Sign and verify APK (trusted runs only)
+    timeout-minutes: 10
     needs: build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -107,6 +112,7 @@ jobs:
 
   publish:
     name: Publish verified release
+    timeout-minutes: 10
     needs: [build, sign]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest

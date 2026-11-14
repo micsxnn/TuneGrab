@@ -139,6 +139,7 @@ object DlpMetadata {
                 }
                 if (flatPlaylist) {
                     addOption("--flat-playlist")
+                    addOption("--playlist-end", "${YtExtractor.MAX_PLAYLIST_ITEMS}")
                 } else {
                     // watch?v=X&list=Y no modo vídeo: só o vídeo, como sempre
                     addOption("--no-playlist")
@@ -153,6 +154,7 @@ object DlpMetadata {
             try {
                 val response = YoutubeDL.execute(req, processId, { _, _, _ -> })
                 val out = response.out.trim()
+                if (out.length > 16 * 1024 * 1024) throw IllegalStateException("metadados excedem o limite permitido")
                 if (out.isNotEmpty()) {
                     Log.d(
                         TAG,
