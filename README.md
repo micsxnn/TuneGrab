@@ -312,17 +312,19 @@ som de carro. Para máxima fidelidade sem reconversão, escolha **M4A** ou
 Requisitos: JDK 17, Android SDK 37 e NDK/CMake (o Gradle baixa o que faltar).
 
 ```bash
-./gradlew assembleRelease   # APK assinado em app/build/outputs/apk/release/
-./gradlew assembleDebug     # APK de debug
+./gradlew assembleDebug        # APK de debug (assinado com a chave de debug padrão)
+./gradlew assembleRelease      # APK de release SEM assinatura (o CI assina)
+./gradlew testDebugUnitTest    # testes de unidade (JVM, sem aparelho)
 ```
 
-O GitHub Actions compila e publica automaticamente a cada tag `v*`.
+O GitHub Actions roda os testes, compila, assina e publica automaticamente a
+cada tag `v*`.
 
-> **Nota sobre a assinatura:** o keystore de release (`app/keystore/`) está
-> commitado com senha pública de propósito, para garantir builds reprodutíveis
-> que se atualizam entre versões. É uma escolha aceitável para um app gratuito
-> e sem dados sensíveis; para uso comercial, mova o keystore para *GitHub
-> Secrets*.
+> **Sobre a assinatura:** a chave de release **não fica no repositório**. Ela
+> vive nos *GitHub Secrets* e o CI assina o APK com rotação de chave (APK
+> Signature Scheme v3), de modo que quem já tem o app instalado continua
+> atualizando normalmente. Detalhes, como gerar e guardar as chaves e o que
+> fazer em caso de perda: [`docs/SIGNING.md`](docs/SIGNING.md).
 
 ## O fork do NewPipeExtractor (motor de fallback)
 

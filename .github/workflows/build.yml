@@ -4,6 +4,8 @@ on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -38,6 +40,18 @@ jobs:
       - name: Setup Gradle (com cache)
         uses: gradle/actions/setup-gradle@v4
 
+      # Testes de unidade (JVM, rápidos): lógica pura de acesso, letras e títulos.
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Upload test report (se falhar)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
       # Push normal compila SÓ o release (é o que a gente instala).
       # Tag compila o debug também (vai anexado na release para depurar).
       # Sem --no-daemon: o daemon aproveita o JIT quente e o setup-gradle o encerra no fim.
@@ -48,6 +62,16 @@ jobs:
           else
             ./gradlew assembleRelease --stacktrace
           fi
+
+      # O Gradle gera o release SEM assinatura; quem assina é este passo
+      # (rotação de chave v3 — veja docs/SIGNING.md e tools/sign-release.sh).
+      - name: Sign release APK
+        env:
+          OLD_KEYSTORE_B64: ${{ secrets.OLD_KEYSTORE_B64 }}
+          OLD_KEYSTORE_PASS: ${{ secrets.OLD_KEYSTORE_PASS }}
+          NEW_KEYSTORE_B64: ${{ secrets.NEW_KEYSTORE_B64 }}
+          NEW_KEYSTORE_PASS: ${{ secrets.NEW_KEYSTORE_PASS }}
+        run: bash tools/sign-release.sh app/build/outputs/apk/release
 
       - name: Upload artifact (release)
         uses: actions/upload-artifact@v4
