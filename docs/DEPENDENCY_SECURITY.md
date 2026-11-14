@@ -10,8 +10,8 @@ Arquivos revisáveis:
 
 - [Grafo release selecionado](security/runtime-dependencies.txt).
 - [Resultado OSV e exceção residual](security/osv-runtime-2026-11-14.json).
-- [Oito hashes comparados novamente com o Maven Central oficial](security/independent-hashes-2026-11-14.json).
-- `gradle/verification-metadata.xml`: 1.232 artefatos de 765 componentes, todos com SHA-256, sem wildcard de confiança. Contém mais que o runtime.
+- [Hashes de oito JARs e seis descritores comparados novamente com o Maven Central oficial](security/independent-hashes-2026-11-14.json).
+- `gradle/verification-metadata.xml`: 1.238 artefatos de 769 componentes, todos com SHA-256, sem wildcard de confiança. Contém mais que o runtime.
 
 ## Atualizações aplicadas
 
