@@ -6,6 +6,7 @@ import java.io.StringReader
 import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
+import org.xml.sax.SAXException
 
 /**
  * LEITOR DE TTML (o XML das letras da Apple Music).
@@ -39,7 +40,8 @@ object TtmlParser {
 
     /** Lê o documento e devolve as linhas com tempo (e sílabas, se houver). */
     fun parse(ttml: String): List<LyricLine> {
-        if (ttml.isBlank() || "<p" !in ttml.lowercase()) return emptyList()
+        if (ttml.length > 2 * 1024 * 1024 || ttml.isBlank() || "<p" !in ttml.lowercase()) return emptyList()
+        if (Regex("<!\\s*(?:DOCTYPE|ENTITY)", RegexOption.IGNORE_CASE).containsMatchIn(ttml)) return emptyList()
         return runCatching {
             val factory = DocumentBuilderFactory.newInstance().apply {
                 isNamespaceAware = false
@@ -49,7 +51,10 @@ object TtmlParser {
                 runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
                 runCatching { isExpandEntityReferences = false }
             }
-            val document = factory.newDocumentBuilder().parse(InputSource(StringReader(ttml)))
+            val builder = factory.newDocumentBuilder().apply {
+                setEntityResolver { _, _ -> throw SAXException("entidades XML externas não são permitidas") }
+            }
+            val document = builder.parse(InputSource(StringReader(ttml)))
             // Ajuste global do relógio: a exportação TTML da Apple traz
             // <head><metadata><audio lyricOffset="…"/> que empurra TODOS os
             // tempos. Ignorar isso dessincroniza a música inteira.

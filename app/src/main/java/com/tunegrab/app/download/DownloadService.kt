@@ -488,6 +488,7 @@ class DownloadService : Service() {
         var tmpOut: File? = null
         var tmpPart: File? = null
         try {
+            if (fileName != DownloadHelpers.sanitizeFileName(fileName)) throw IOException("nome de arquivo inválido")
             checkStop()
 
             // ---------- PLANO A: yt-dlp embutido ----------

@@ -1,5 +1,6 @@
 package com.tunegrab.app.lyrics
 
+import com.tunegrab.app.security.BoundedBodyInterceptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -85,6 +86,8 @@ object LyricsNetwork {
             .readTimeout(15, TimeUnit.SECONDS)
             .callTimeout(25, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .followSslRedirects(false)
+            .addInterceptor(BoundedBodyInterceptor(8L * 1024 * 1024))
             .build()
     }
 

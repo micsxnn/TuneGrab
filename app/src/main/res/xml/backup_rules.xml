@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Preferences/favorites may be restored; credentials and device-bound activation may not. -->
+    <exclude domain="sharedpref" path="access_gate.xml" />
+    <exclude domain="sharedpref" path="yt_cookies.xml" />
+    <exclude domain="root" path="app_webview/" />
+    <exclude domain="file" path="cookies.txt" />
+    <exclude domain="file" path="cookies.txt.tmp" />
+    <exclude domain="file" path="cookies.txt.bak" />
+    <exclude domain="file" path="updates/" />
+    <exclude domain="external" path="updates/" />
+</full-backup-content>

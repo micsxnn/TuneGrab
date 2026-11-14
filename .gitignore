@@ -18,3 +18,8 @@ __pycache__/
 *.p12
 *.pfx
 *.lineage
+
+# Credenciais locais
+.env
+.env.*
+!.env.example

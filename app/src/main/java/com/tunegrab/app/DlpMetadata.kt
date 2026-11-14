@@ -1,6 +1,7 @@
 package com.tunegrab.app
 
 import android.content.Context
+import com.tunegrab.app.security.YoutubeLinks
 import android.util.Log
 import com.tunegrab.app.yt.YtDlpEngine
 import com.tunegrab.app.yt.YtExtractor
@@ -88,7 +89,7 @@ object DlpMetadata {
                 val id = e.optString("id", "")
                 if (id.isNotBlank()) u = "https://www.youtube.com/watch?v=$id"
             }
-            if (u.isBlank()) continue
+            u = YoutubeLinks.canonicalVideoUrl(u) ?: continue
             val name = e.optString("title", "").ifBlank { "video" }
             val dur = e.optDouble("duration", 0.0).toLong()
             items.add(YtExtractor.PlaylistMeta.Item(u, name, dur))
@@ -117,10 +118,15 @@ object DlpMetadata {
      * que o execute() separa em response.err).
      */
     private fun dumpJson(url: String, flatPlaylist: Boolean): JSONObject {
+        val safeUrl = YoutubeLinks.downloadUrl(url)
+            ?: throw IllegalArgumentException("URL do YouTube não reconhecida")
         var attempt = 0
         while (true) {
             val client = clientFor(attempt)
-            val req = YoutubeDLRequest(url).apply {
+            val req = YoutubeDLRequest(safeUrl).apply {
+                addOption("--ignore-config")
+                addOption("--no-plugin-dirs")
+                addOption("--use-extractors", "youtube.*")
                 addOption("--no-warnings")
                 addOption("--socket-timeout", "20")
                 // espaça as chamadas ao innertube — mesma higiene do motor
@@ -229,10 +235,11 @@ object DlpMetadata {
             }
         }
         val id = json.optString("id", "")
-        val webUrl = json.optString("webpage_url", "").ifBlank {
+        val rawWebUrl = json.optString("webpage_url", "").ifBlank {
             if (id.isNotBlank()) "https://www.youtube.com/watch?v=$id" else ""
         }
-        if (webUrl.isBlank()) {
+        val webUrl = YoutubeLinks.canonicalVideoUrl(rawWebUrl)
+        if (webUrl == null) {
             throw IllegalStateException("yt-dlp não devolveu a URL do vídeo")
         }
         val title = json.optString("title", "").ifBlank { "video" }

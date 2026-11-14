@@ -18,8 +18,8 @@ android {
         applicationId = "com.tunegrab.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 100
-        versionName = "0.22.27"
+        versionCode = 101
+        versionName = "0.22.28"
 
         // ABIs do motor yt-dlp embutido (python + ffmpeg são nativos).
         // x86/x86_64 ficam de fora para o APK não dobrar de tamanho —
@@ -34,10 +34,9 @@ android {
     // do GitHub). Veja docs/SIGNING.md. Debug continua com a chave de debug padrão.
     buildTypes {
         release {
-            // R8 só no modo ENCOLHER (tree-shaking): sem ofuscar e sem otimizar,
-            // porque o app depende de reflexão (yt-dlp, NewPipe, Ktor, Jackson).
-            // As regras estão em proguard-rules.pro.
-            isMinifyEnabled = true
+            // Release de segurança: preservar o comportamento de reflexão/JNI.
+            // As regras do R8 ficam prontas, mas encolhimento não é ativado sem teste em aparelho.
+            isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -139,7 +138,7 @@ dependencies {
     //  3) suporte completo a PoTokenProvider: player request WEB com PoToken (destrava o
     //     bot-check "Sign in to confirm you're not a bot"), client iOS com PoToken e
     //     WEB+PoToken/iOS/visionOS/TV como fallback primário quando os clients anônimos falham.
-    implementation("com.github.MicaelSanPedro:NewPipeExtractor:v0.26.5-android4")
+    implementation("com.github.micsxnn:NewPipeExtractor:81235e4e48240a540d85eca2fbd6e352f6411043")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Motor de download yt-dlp EMBUTIDO no APK (python 3.12 + yt-dlp + ffmpeg),
@@ -200,7 +199,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.12.0")
 
     // Parser HTML — raspagem das fontes de letra (Genius).
-    implementation("org.jsoup:jsoup:1.18.3")
+    implementation("org.jsoup:jsoup:1.23.2")
 }
 
 // Testes de unidade (JVM, sem aparelho): lógica pura do app.

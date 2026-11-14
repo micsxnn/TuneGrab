@@ -3,7 +3,8 @@ package com.tunegrab.app.access
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
-import android.util.Base64
+import com.tunegrab.app.security.boundedText
+import okio.ByteString.Companion.decodeBase64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -64,7 +65,7 @@ object AccessGate {
         object Failed : Verdict     // outro problema (JSON quebrado etc.)
     }
 
-    private data class Entry(
+    internal data class Entry(
         val id: String,
         val salt: ByteArray,
         val hash: ByteArray,
@@ -83,6 +84,11 @@ object AccessGate {
      *  e a lista inteira é re-emitida. O espelho em Python vive no passgen. */
     private val DEVICE_CODE_KEY = "TuneGrabDeviceCode-v1".toByteArray(Charsets.UTF_8)
 
+    private const val MAX_LIST_BYTES = 256 * 1024
+    private const val MAX_ENTRIES = 256
+    private const val MAX_ITERATIONS = 1_000_000
+    private const val MAX_TOTAL_ITERATIONS = 20_000_000L
+
     private const val PREFS = "access_gate"
     private const val KEY_UNLOCKED = "unlocked"
     private const val KEY_ENTRY = "entry_id"
@@ -91,6 +97,8 @@ object AccessGate {
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        .followSslRedirects(false)
         .build()
 
     /** O aparelho já foi liberado por alguma senha? */
@@ -168,8 +176,11 @@ object AccessGate {
         // "TUNE 7K3M 9QPD" e "TUNE7K3M9QPD" viram a MESMA chave. É esse
         // canônico que o gerador hasheou (as linhas de display são só
         // máscara pra leitura humana).
+        if (typed.length > 256) return@withContext Verdict.Wrong
         val canonical = canonicalize(typed)
         if (canonical.isBlank()) return@withContext Verdict.Empty
+        if (canonical.length != 12 || !canonical.startsWith("TUNE") ||
+            canonical.drop(4).any { it !in ALPHABET }) return@withContext Verdict.Wrong
 
         val body = try {
             fetchList()
@@ -208,47 +219,40 @@ object AccessGate {
         val request = Request.Builder().url(url).build()
         return http.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) throw IllegalStateException("HTTP ${resp.code}")
-            resp.body?.string() ?: throw IllegalStateException("resposta vazia")
+            resp.body?.boundedText(MAX_LIST_BYTES) ?: throw IllegalStateException("resposta vazia")
         }
     }
 
-    /** null = JSON quebrado (Failed); lista vazia/sem hashes = NoActive.
-     *  Binding "device" é OPCIONAL: presente e MALFORMADO = fail-closed
-     *  (salt vazio x hash vazio nunca batem com nada — a entrada morre). */
-    private fun parseEntries(body: String): List<Entry>? {
+    /** Missing device = legacy invitation. Present but malformed device must NEVER become unbound. */
+    internal fun parseEntries(body: String): List<Entry>? {
+        if (body.length > MAX_LIST_BYTES) return null
         return try {
             val root = JSONObject(body)
             val arr = root.optJSONArray("hashes") ?: return emptyList()
+            if (arr.length() > MAX_ENTRIES) return null
+            var iterationsBudget = 0L
             buildList {
                 for (i in 0 until arr.length()) {
-                    val o = arr.optJSONObject(i) ?: continue
-                    val salt = try {
-                        Base64.decode(o.optString("salt"), Base64.DEFAULT)
-                    } catch (t: Throwable) { ByteArray(0) }
-                    val hash = try {
-                        Base64.decode(o.optString("hash"), Base64.DEFAULT)
-                    } catch (t: Throwable) { ByteArray(0) }
-                    val iters = o.optInt("iters", 0)
-                    val dev = o.optJSONObject("device")
-                    val binding: Pair<ByteArray, ByteArray>? = when {
-                        dev == null -> null // entrada SOLTA (formato v0.20.0 ou sem binding)
-                        else -> {
-                            val ds = try {
-                                Base64.decode(dev.optString("salt"), Base64.DEFAULT)
-                            } catch (t: Throwable) { ByteArray(0) }
-                            val dh = try {
-                                Base64.decode(dev.optString("hash"), Base64.DEFAULT)
-                            } catch (t: Throwable) { ByteArray(0) }
-                            if (ds.size == 16 && dh.size == 32) ds to dh
-                            else ByteArray(0) to ByteArray(0) // binding quebrado = fail-closed
-                        }
-                    }
-                    if (salt.isNotEmpty() && hash.size == 32 && iters > 0) {
-                        add(Entry(o.optString("id", ""), salt, hash, iters, binding))
-                    }
+                    val entry = arr.optJSONObject(i) ?: continue
+                    val salt = entry.optString("salt").decodeBase64()?.toByteArray() ?: continue
+                    val hash = entry.optString("hash").decodeBase64()?.toByteArray() ?: continue
+                    val iters = entry.optString("iters").toIntOrNull() ?: continue
+                    if (salt.size !in 16..64 || hash.size != 32 || iters !in 1..MAX_ITERATIONS) continue
+                    val binding: Pair<ByteArray, ByteArray>? = if (entry.has("device")) {
+                        val device = entry.optJSONObject("device") ?: continue
+                        val ds = device.optString("salt").decodeBase64()?.toByteArray() ?: continue
+                        val dh = device.optString("hash").decodeBase64()?.toByteArray() ?: continue
+                        if (ds.size != 16 || dh.size != 32) continue
+                        ds to dh
+                    } else null
+                    val id = entry.optString("id", "")
+                    if (id.isBlank() || id.length > 128) continue
+                    iterationsBudget += iters
+                    if (iterationsBudget > MAX_TOTAL_ITERATIONS) return null
+                    add(Entry(id, salt, hash, iters, binding))
                 }
             }
-        } catch (t: Throwable) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -264,6 +268,7 @@ object AccessGate {
         iterations: Int,
         dkLen: Int
     ): ByteArray {
+        require(iterations > 0 && dkLen in 1..4096)
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(password, "HmacSHA256"))
         val hLen = 32
@@ -273,7 +278,7 @@ object AccessGate {
         for (block in 1..blocks) {
             // U1 = PRF(P, salt || INT_32_BE(block))
             mac.update(salt)
-            var u = mac.doFinal(byteArrayOf(0, 0, 0, block.toByte()))
+            var u = mac.doFinal(byteArrayOf((block ushr 24).toByte(), (block ushr 16).toByte(), (block ushr 8).toByte(), block.toByte()))
             val t = u.copyOf()
             for (iter in 2..iterations) {
                 u = mac.doFinal(u)

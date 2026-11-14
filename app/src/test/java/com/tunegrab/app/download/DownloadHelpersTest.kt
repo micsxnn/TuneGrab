@@ -127,4 +127,17 @@ class DownloadHelpersTest {
         assertNull(DownloadHelpers.parseSpeedBytesPerSec("at 0.00MiB/s"))
         assertNotNull(DownloadHelpers.parseSpeedBytesPerSec("at 0.01MiB/s"))
     }
+
+    @Test
+    fun uniqueFile_sanitizes_untrusted_names_before_resolving() {
+        val result = DownloadHelpers.uniqueFile(tmp.root, "../../outside.mp3")
+        assertEquals(tmp.root.canonicalFile, result.canonicalFile.parentFile)
+        assertEquals(".._.._outside.mp3", result.name)
+    }
+
+    @Test
+    fun percent_does_not_overflow_long_arithmetic() {
+        assertEquals(50, DownloadHelpers.percent(Long.MAX_VALUE / 2, Long.MAX_VALUE))
+        assertEquals(100, DownloadHelpers.percent(Long.MAX_VALUE, Long.MAX_VALUE))
+    }
 }

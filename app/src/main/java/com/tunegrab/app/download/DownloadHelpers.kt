@@ -24,10 +24,11 @@ object DownloadHelpers {
 
     /** Se "x.mp3" já existe, devolve "x (1).mp3", "x (2).mp3"... */
     fun uniqueFile(dir: File, fileName: String): File {
-        var candidate = File(dir, fileName)
+        val safeName = sanitizeFileName(fileName)
+        var candidate = File(dir, safeName)
         if (!candidate.exists()) return candidate
-        val base = fileName.substringBeforeLast('.')
-        val ext = fileName.substringAfterLast('.', "")
+        val base = safeName.substringBeforeLast('.')
+        val ext = safeName.substringAfterLast('.', "")
         var i = 1
         while (candidate.exists()) {
             val name = if (ext.isBlank()) "$base ($i)" else "$base ($i).$ext"
@@ -39,7 +40,7 @@ object DownloadHelpers {
 
     /** Porcentagem 0..100; total desconhecido (<= 0) vira 0. */
     fun percent(done: Long, total: Long): Int =
-        if (total > 0) ((done * 100) / total).toInt().coerceIn(0, 100) else 0
+        if (total > 0) ((done.coerceIn(0, total).toDouble() / total) * 100).toInt().coerceIn(0, 100) else 0
 
     /**
      * Velocidade em bytes/s lida da linha do yt-dlp:

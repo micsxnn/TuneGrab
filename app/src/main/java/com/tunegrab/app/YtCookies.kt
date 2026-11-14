@@ -2,6 +2,8 @@ package com.tunegrab.app
 
 import android.content.Context
 import android.util.Log
+import android.util.AtomicFile
+import com.tunegrab.app.security.CookieHeaders
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
 import java.util.Locale
@@ -26,7 +28,7 @@ import java.util.Locale
  * sem tela extra. A seção de cookies das Configurações saiu de cena —
  * "isso é patético, ninguém sabe mexer nisso", e agora ninguém precisa.
  *
- * Segurança: o arquivo vive em filesDir (privado do app, some com a
+ * Segurança: o arquivo vive em noBackupFilesDir (privado do app, some com a
  * desinstalação), nunca vai para log, e é enviado SÓ para o processo do
  * yt-dlp via --cookies. Nada é enviado a lugar nenhum pelo TuneGrab.
  *
@@ -55,13 +57,25 @@ object YtCookies {
     /** Ligar uma vez no [com.tunegrab.app.TuneGrabApp.onCreate] — o motor
      *  (YtDlpEngine) não recebe Context, então o caminho do arquivo fica
      *  cached aqui (mesmo padrão do PoTokenManager.init). */
+    @Synchronized
     fun init(ctx: Context) {
         appCtx = ctx.applicationContext
+        val legacy = File(ctx.applicationContext.filesDir, "cookies.txt")
+        if (legacy.isFile) {
+            try {
+                if (file(ctx).exists() || (legacy.length() <= 256 * 1024 && writeAtomically(ctx, legacy.readText()))) {
+                    legacy.delete()
+                    File(ctx.applicationContext.filesDir, "cookies.txt.tmp").delete()
+                }
+            } catch (_: Exception) {
+                Log.w(TAG, "não foi possível migrar os cookies para armazenamento sem backup")
+            }
+        }
     }
 
     // ---------- estado ----------
 
-    fun file(ctx: Context): File = File(ctx.applicationContext.filesDir, "cookies.txt")
+    fun file(ctx: Context): File = File(ctx.applicationContext.noBackupFilesDir, "cookies.txt")
 
     /** True com arquivo não-vazio. Consultado pelo motor A CADA request. */
     fun has(ctx: Context): Boolean = try {
@@ -95,14 +109,7 @@ object YtCookies {
      * SAPISID ficam em .youtube.com).
      */
     fun saveFromWebView(ctx: Context, cookieHeader: String): Boolean {
-        val pairs = cookieHeader.split(";")
-            .mapNotNull { p ->
-                val i = p.indexOf('=')
-                if (i <= 0) return@mapNotNull null
-                val name = p.substring(0, i).trim()
-                val value = p.substring(i + 1).trim()
-                if (name.isBlank() || value.isBlank()) null else name to value
-            }
+        val pairs = CookieHeaders.parse(cookieHeader)
         if (pairs.isEmpty()) return false
         val expiry = System.currentTimeMillis() / 1000L + EXPIRY_DAYS * DAY_SECONDS
         val sb = StringBuilder()
@@ -119,14 +126,7 @@ object YtCookies {
     }
 
     /** True se o header contém cookie de SESSÃO LOGADA (não só anônimos). */
-    fun headerHasLogin(cookieHeader: String?): Boolean {
-        if (cookieHeader.isNullOrBlank()) return false
-        val markers = listOf(
-            "SID=", "HSID=", "SSID=", "SAPISID=", "APISID=",
-            "__Secure-1PSID", "__Secure-3PSID"
-        )
-        return markers.any { cookieHeader.contains(it, ignoreCase = true) }
-    }
+    fun headerHasLogin(cookieHeader: String?): Boolean = CookieHeaders.hasLogin(cookieHeader)
 
     /**
      * CAPTURA AUTOMÁTICA (v0.19.8): chamada pela aba YouTube a cada página
@@ -140,7 +140,7 @@ object YtCookies {
         if (!headerHasLogin(header)) return false
         val sig = loginSignature(header!!)
         val prefs = ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getString(KEY_SIG, "") == sig) return false // mesma sessão de sempre
+        if (prefs.getString(KEY_SIG, "") == sig && has(ctx)) return false // mesma sessão de sempre
         if (!saveFromWebView(ctx, header)) return false
         prefs.edit().putString(KEY_SIG, sig).apply()
         return true
@@ -166,26 +166,7 @@ object YtCookies {
      * os OUTROS cookies (VISITOR_INFO1_LIVE, YSC, pretextos de consentimento)
      * muda o tempo todo e NÃO pode disparar regravação.
      */
-    private fun loginSignature(header: String): String {
-        val names = setOf(
-            "SID", "HSID", "SSID", "SAPISID", "APISID",
-            "__Secure-1PSID", "__Secure-3PSID"
-        )
-        val pairs = header.split(";").mapNotNull { p ->
-            val i = p.indexOf('=')
-            if (i <= 0) return@mapNotNull null
-            val name = p.substring(0, i).trim()
-            if (name !in names) null else name to p.substring(i + 1).trim()
-        }.sortedBy { it.first }
-        val seed = pairs.joinToString(";") { "${it.first}=${it.second}" }
-        return try {
-            val md = java.security.MessageDigest.getInstance("MD5")
-            md.digest(seed.toByteArray()).joinToString("") { "%02x".format(it) }
-        } catch (_: Throwable) {
-            // sem MessageDigest (improvável): o valor cru serve de assinatura
-            seed
-        }
-    }
+    private fun loginSignature(header: String): String = CookieHeaders.loginSignature(header)
 
     // ---------- saída: para o yt-dlp ----------
 
@@ -209,22 +190,24 @@ object YtCookies {
 
     // ---------- internals ----------
 
-    private fun writeAtomically(ctx: Context, content: String): Boolean = try {
-        val tmp = File(ctx.applicationContext.filesDir, "cookies.txt.tmp")
-        tmp.writeText(content)
-        val dst = file(ctx)
-        if (dst.exists()) dst.delete()
-        if (!tmp.renameTo(dst)) {
-            // rename entre arquivos do MESMO dir não deveria falhar; rede de
-            // segurança: cópia direta
-            dst.outputStream().use { o -> tmp.inputStream().use { i -> i.copyTo(o) } }
-            tmp.delete()
+    @Synchronized
+    private fun writeAtomically(ctx: Context, content: String): Boolean {
+        val atomic = AtomicFile(file(ctx))
+        return try {
+            val stream = atomic.startWrite()
+            try {
+                stream.write(content.toByteArray(Charsets.UTF_8))
+                atomic.finishWrite(stream)
+            } catch (error: Throwable) {
+                atomic.failWrite(stream)
+                throw error
+            }
+            Log.i(TAG, "cookies salvos no armazenamento privado sem backup")
+            true
+        } catch (error: Exception) {
+            Log.w(TAG, "falha ao salvar cookies", error)
+            false
         }
-        Log.i(TAG, "cookies salvos (${dst.length()} bytes)")
-        true
-    } catch (t: Throwable) {
-        Log.w(TAG, "falha ao salvar cookies", t)
-        false
     }
 
     private fun markSaved(ctx: Context, src: String) {

@@ -6,6 +6,7 @@
 #include <jni.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <limits.h>
 #include "lame.h"
 
 #define MP3_BUF_EXTRA 7200
@@ -15,6 +16,9 @@ Java_com_tunegrab_app_audio_Mp3Encoder_nativeInit(
         JNIEnv *env, jclass clazz,
         jint sampleRate, jint channels, jint kbps,
         jstring title, jstring artist) {
+    if (sampleRate < 8000 || sampleRate > 192000 || channels < 1 || channels > 2 || kbps < 8 || kbps > 320) {
+        return 0;
+    }
     lame_global_flags *gfp = lame_init();
     if (gfp == NULL) {
         return 0;
@@ -52,24 +56,32 @@ Java_com_tunegrab_app_audio_Mp3Encoder_nativeEncode(
         JNIEnv *env, jclass clazz,
         jlong handle, jshortArray pcm, jint frames) {
     lame_global_flags *gfp = (lame_global_flags *) (intptr_t) handle;
-    if (gfp == NULL || frames <= 0) {
+    if (gfp == NULL || pcm == NULL || frames <= 0) {
         return NULL;
     }
 
     jsize totalShorts = (*env)->GetArrayLength(env, pcm);
-    if ((jint) totalShorts < frames * lame_get_num_channels(gfp)) {
+    int channels = lame_get_num_channels(gfp);
+    /* Divide before comparing: frames * channels can overflow a signed int. */
+    if (channels < 1 || channels > 2 || frames > totalShorts / channels) {
         return NULL;
     }
-
-    int bufSize = (int) (1.25 * frames) + MP3_BUF_EXTRA;
+    int64_t required = ((int64_t) frames * 5) / 4 + MP3_BUF_EXTRA;
+    if (required > INT_MAX) return NULL;
+    int bufSize = (int) required;
     unsigned char *buf = (unsigned char *) malloc((size_t) bufSize);
     if (buf == NULL) {
         return NULL;
     }
 
     jshort *in = (*env)->GetShortArrayElements(env, pcm, NULL);
-    int written = lame_encode_buffer_interleaved(
-            gfp, in, (int) frames, buf, bufSize);
+    if (in == NULL) {
+        free(buf);
+        return NULL; /* Preserve the pending JVM exception (e.g. OutOfMemoryError). */
+    }
+    int written = channels == 1
+            ? lame_encode_buffer(gfp, in, in, (int) frames, buf, bufSize)
+            : lame_encode_buffer_interleaved(gfp, in, (int) frames, buf, bufSize);
     (*env)->ReleaseShortArrayElements(env, pcm, in, JNI_ABORT);
 
     if (written < 0) {
@@ -78,7 +90,7 @@ Java_com_tunegrab_app_audio_Mp3Encoder_nativeEncode(
     }
 
     jbyteArray result = (*env)->NewByteArray(env, written);
-    (*env)->SetByteArrayRegion(env, result, 0, written, (jbyte *) buf);
+    if (result != NULL) (*env)->SetByteArrayRegion(env, result, 0, written, (jbyte *) buf);
     free(buf);
     return result;
 }
@@ -101,7 +113,7 @@ Java_com_tunegrab_app_audio_Mp3Encoder_nativeFlush(
         return NULL;
     }
     jbyteArray result = (*env)->NewByteArray(env, written);
-    (*env)->SetByteArrayRegion(env, result, 0, written, (jbyte *) buf);
+    if (result != NULL) (*env)->SetByteArrayRegion(env, result, 0, written, (jbyte *) buf);
     free(buf);
     return result;
 }

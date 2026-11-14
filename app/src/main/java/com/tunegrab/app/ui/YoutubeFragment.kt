@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import com.tunegrab.app.security.YoutubeLinks
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -78,6 +80,7 @@ class YoutubeFragment : Fragment() {
             allowContentAccess = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             mediaPlaybackRequiresUserGesture = true
+            if (Build.VERSION.SDK_INT >= 26) safeBrowsingEnabled = true
             // login do Google (v0.19.8): redirects/janelas do fluxo de conta
             // precisam disso pra não quebrar no meio do "Entrar"
             javaScriptCanOpenWindowsAutomatically = true
@@ -107,15 +110,23 @@ class YoutubeFragment : Fragment() {
                 request: WebResourceRequest
             ): Boolean {
                 val url = request.url
-                if (isYouTubeInternal(url)) return false // a web mesma carrega
-                // link de fora (play store, redes sociais, tel:, mailto:…):
-                // abre no navegador do sistema — não sequestra o app
-                return try {
-                    startActivity(Intent(Intent.ACTION_VIEW, url))
-                    true
-                } catch (ignored: Throwable) {
-                    true
+                val internal = YoutubeLinks.browserUrl(url.toString())
+                if (internal != null) {
+                    if (url.scheme == "http") {
+                        view.loadUrl(internal)
+                        return true
+                    }
+                    return false
                 }
+                // A web page must not launch arbitrary app/file/content intents, nor launch apps from iframes.
+                if (request.isForMainFrame && request.hasGesture() && YoutubeLinks.mayOpenExternally(url.toString())) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, url).addCategory(Intent.CATEGORY_BROWSABLE))
+                    } catch (_: Exception) {
+                        // No application handles this user-initiated link.
+                    }
+                }
+                return true
             }
 
             override fun doUpdateVisitedHistory(
@@ -154,8 +165,8 @@ class YoutubeFragment : Fragment() {
                 false
             }
         }
-        if (!restored || web.url.isNullOrBlank()) {
-            web.loadUrl(lastUrl ?: HOME_URL)
+        if (!restored || web.url?.let(YoutubeLinks::browserUrl) == null) {
+            web.loadUrl(lastUrl?.let(YoutubeLinks::browserUrl) ?: HOME_URL)
         }
     }
 
@@ -204,16 +215,6 @@ class YoutubeFragment : Fragment() {
         (activity as? MainActivity)?.openDownloadFor(url)
     }
 
-    /** True pra navegação que deve acontecer DENTRO da aba: YouTube inteiro
-     *  (vídeos, shorts, results, consent) + domínios do Google que o login e
-     *  o consentimento usam. Todo o resto é do navegador do sistema. */
-    private fun isYouTubeInternal(u: Uri): Boolean {
-        if ((u.scheme?.lowercase() ?: "") !in listOf("http", "https")) return false
-        val host = (u.host ?: "").lowercase()
-        return host == "youtube.com" || host.endsWith(".youtube.com") ||
-            host == "youtu.be" || host == "google.com" || host.endsWith(".google.com")
-    }
-
     override fun onDestroyView() {
         super.onDestroyView()
         val web = binding.webYt
@@ -236,27 +237,7 @@ class YoutubeFragment : Fragment() {
         _binding = null
     }
 
-    private fun videoIdOf(url: String?): String? {
-        if (url.isNullOrBlank()) return null
-        return try {
-            val u = Uri.parse(url)
-            val host = (u.host ?: "").lowercase()
-            when {
-                host == "youtu.be" ->
-                    u.pathSegments.firstOrNull()?.takeIf { it.length >= 5 }
-                host == "youtube.com" || host.endsWith(".youtube.com") -> when {
-                    u.path == "/watch" ->
-                        u.getQueryParameter("v")?.takeIf { it.length >= 5 }
-                    u.path?.startsWith("/shorts/") == true ->
-                        u.pathSegments.getOrNull(1)?.takeIf { it.length >= 5 }
-                    else -> null
-                }
-                else -> null
-            }
-        } catch (ignored: Throwable) {
-            null
-        }
-    }
+    private fun videoIdOf(url: String?): String? = YoutubeLinks.videoIdOf(url)
 
     companion object {
         private const val HOME_URL = "https://m.youtube.com/"

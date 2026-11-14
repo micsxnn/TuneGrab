@@ -1,89 +1,71 @@
 #!/usr/bin/env bash
-# Assina o APK de release com ROTAÇÃO DE CHAVE (APK Signature Scheme v3).
-#
-# Por quê: a chave antiga vazou (estava no repositório). Rotação é a única forma
-# de trocar a chave SEM obrigar ninguém a desinstalar o app:
-#   - Android 9+  (API 28+): vê a chave NOVA + a prova de que veio da antiga.
-#   - Android 7-8 (API 24-27): continua vendo a chave ANTIGA (não suporta rotação).
-# A chave antiga perde a permissão de "rollback": um APK assinado só com ela não
-# consegue mais substituir um app que já migrou para a nova.
-# Detalhes e como gerar/guardar as chaves: docs/SIGNING.md
-#
-# Variáveis (GitHub Secrets):
-#   OLD_KEYSTORE_B64 / OLD_KEYSTORE_PASS   chave original (alias "tunegrab")
-#   NEW_KEYSTORE_B64 / NEW_KEYSTORE_PASS   chave nova     (alias "tunegrab")
+# Private keys are supplied only to this trusted CI step; never to PR builds or artifacts.
+# v3.1 rotates on Android 13+; Android 7-12 retain the legacy signer for compatibility.
 set -euo pipefail
-
+umask 077
 DIR="${1:-app/build/outputs/apk/release}"
 ALIAS="tunegrab"
-
-: "${ANDROID_HOME:=${ANDROID_SDK_ROOT:-}}"
-BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-echo "build-tools: $BT"
-
-UNSIGNED="$(ls "$DIR"/*-unsigned.apk | head -1)"
-WORK="${RUNNER_TEMP:-$(mktemp -d)}/sign"
-mkdir -p "$WORK"; umask 077
-
-if [[ -z "${NEW_KEYSTORE_B64:-}" || -z "${OLD_KEYSTORE_B64:-}" ]]; then
-  if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-    echo "::error::Secrets de assinatura ausentes: release de tag não pode sair sem assinar."
-    exit 1
-  fi
-  echo "::warning::Secrets de assinatura ausentes (fork?). APK fica SEM assinatura."
-  exit 0
+VERSION="$(sed -nE 's/^[[:space:]]*versionName = "([0-9]+(\.[0-9]+){1,3})"/\1/p' app/build.gradle.kts)"
+[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || { echo 'Invalid release version'; exit 1; }
+if [[ "${GITHUB_REF:-}" == refs/tags/* && "${GITHUB_REF_NAME:-}" != "v$VERSION" ]]; then
+  echo 'Tag and APK version do not match'; exit 1
 fi
-
-echo "$OLD_KEYSTORE_B64" | base64 -d > "$WORK/old.p12"
-echo "$NEW_KEYSTORE_B64" | base64 -d > "$WORK/new.p12"
+: "${ANDROID_HOME:=${ANDROID_SDK_ROOT:-}}"
+BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+[[ -x "$BT/apksigner" && -x "$BT/zipalign" ]] || { echo 'Android signing tools unavailable'; exit 1; }
+for variable in OLD_KEYSTORE_B64 OLD_KEYSTORE_PASS NEW_KEYSTORE_B64 NEW_KEYSTORE_PASS; do
+  [[ -n "${!variable:-}" ]] || { echo "Missing signing secret: $variable"; exit 1; }
+done
+shopt -s nullglob
+APKS=("$DIR"/*-unsigned.apk)
+[[ ${#APKS[@]} -eq 1 ]] || { echo 'Expected exactly one unsigned APK'; exit 1; }
+UNSIGNED="${APKS[0]}"
+WORK="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/tunegrab-sign.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+printf '%s' "$OLD_KEYSTORE_B64" | base64 --decode > "$WORK/old.p12"
+printf '%s' "$NEW_KEYSTORE_B64" | base64 --decode > "$WORK/new.p12"
 export OLD_KEYSTORE_PASS NEW_KEYSTORE_PASS
-
-fp() { # SHA-256 do certificado do keystore, minúsculo e sem ":"
-  keytool -list -v -keystore "$1" -storepass "$2" -alias "$ALIAS" 2>/dev/null \
-    | awk '/SHA256:/ {print tolower($2)}' | tr -d ':'
+fingerprint() {
+  keytool -exportcert -keystore "$1" -storepass:env "$2" -alias "$ALIAS" 2>/dev/null | sha256sum | cut -d' ' -f1
 }
-OLD_FP="$(fp "$WORK/old.p12" "$OLD_KEYSTORE_PASS")"
-NEW_FP="$(fp "$WORK/new.p12" "$NEW_KEYSTORE_PASS")"
-[[ -n "$OLD_FP" && -n "$NEW_FP" && "$OLD_FP" != "$NEW_FP" ]] || { echo "::error::keystores inválidos"; exit 1; }
-
-# Linhagem: antiga -> nova, com a antiga SEM permissão de rollback.
+OLD_FP="$(fingerprint "$WORK/old.p12" OLD_KEYSTORE_PASS)"
+NEW_FP="$(fingerprint "$WORK/new.p12" NEW_KEYSTORE_PASS)"
+[[ "$OLD_FP" =~ ^[0-9a-f]{64}$ && "$NEW_FP" =~ ^[0-9a-f]{64}$ && "$OLD_FP" != "$NEW_FP" ]] || {
+  echo 'Invalid or identical signing certificates'; exit 1;
+}
 "$BT/apksigner" rotate --out "$WORK/lineage" \
   --old-signer --ks "$WORK/old.p12" --ks-key-alias "$ALIAS" \
     --ks-pass env:OLD_KEYSTORE_PASS --key-pass env:OLD_KEYSTORE_PASS --set-rollback false \
   --new-signer --ks "$WORK/new.p12" --ks-key-alias "$ALIAS" \
     --ks-pass env:NEW_KEYSTORE_PASS --key-pass env:NEW_KEYSTORE_PASS
-
-# zipalign ANTES de assinar (assinar invalida o alinhamento depois).
-"$BT/zipalign" -p -f 4 "$UNSIGNED" "$WORK/aligned.apk"
-
-SIGNED="$DIR/app-release.apk"
+"$BT/zipalign" -P 16 -f 4 "$UNSIGNED" "$WORK/aligned.apk"
+SIGNED="$DIR/TuneGrab-v$VERSION.apk"
 "$BT/apksigner" sign \
   --ks "$WORK/old.p12" --ks-key-alias "$ALIAS" \
     --ks-pass env:OLD_KEYSTORE_PASS --key-pass env:OLD_KEYSTORE_PASS \
-  --next-signer \
-  --ks "$WORK/new.p12" --ks-key-alias "$ALIAS" \
+  --next-signer --ks "$WORK/new.p12" --ks-key-alias "$ALIAS" \
     --ks-pass env:NEW_KEYSTORE_PASS --key-pass env:NEW_KEYSTORE_PASS \
-  --lineage "$WORK/lineage" --rotation-min-sdk-version 28 \
+  --lineage "$WORK/lineage" --rotation-min-sdk-version 33 \
   --out "$SIGNED" "$WORK/aligned.apk"
-rm -f "$UNSIGNED" "$SIGNED.idsig"
-
-"$BT/apksigner" verify --verbose "$SIGNED" | grep -E "Verifies|Verified using|Number of signers"
-
-# Trava de segurança: o certificado que cada faixa de Android enxerga TEM que ser
-# o esperado. Se a rotação sair errada, o build falha aqui, antes de publicar um
-# APK que impediria as pessoas de atualizar.
-cert() { # $1=min $2=max
+"$BT/apksigner" verify --verbose "$SIGNED"
+cert() {
   "$BT/apksigner" verify --print-certs --min-sdk-version "$1" --max-sdk-version "$2" "$SIGNED" \
     | awk '/certificate SHA-256 digest/ {print tolower($NF)}'
 }
 check() {
-  local got; got="$(cert "$1" "$2")"
-  [[ "$got" == "$3" ]] || { echo "::error::API $1-$2 enxerga '$got', esperado '$3'"; exit 1; }
-  echo "OK  API $1-$2 -> ${got:0:16}..."
+  local actual; actual="$(cert "$1" "$2")"
+  [[ "$actual" == "$3" ]] || { echo "Incorrect certificate for API $1-$2"; exit 1; }
+  echo "Verified certificate for API $1-$2: $actual"
 }
 check 24 27 "$OLD_FP"
-check 28 32 "$NEW_FP"
+check 28 32 "$OLD_FP"
 check 33 99 "$NEW_FP"
-
-shred -u "$WORK"/*.p12 2>/dev/null || rm -f "$WORK"/*.p12
-echo "APK assinado: $SIGNED"
+cp "$WORK/lineage" "$DIR/signing.lineage"
+{
+  printf 'Legacy certificate SHA-256 (Android 7-12): %s\n' "$OLD_FP"
+  printf 'Rotated certificate SHA-256 (Android 13+): %s\n' "$NEW_FP"
+  printf 'Rotation minimum API: 33\nLegacy rollback capability: disabled\n'
+} > "$DIR/SIGNING-CERTIFICATES.txt"
+(cd "$DIR" && sha256sum "TuneGrab-v$VERSION.apk" > SHA256SUMS)
+rm -f "$UNSIGNED" "$SIGNED.idsig"
+echo "Verified release APK: $SIGNED"

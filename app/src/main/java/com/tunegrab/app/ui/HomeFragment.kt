@@ -29,6 +29,7 @@ import com.tunegrab.app.BuildConfig
 import com.tunegrab.app.DownloadRequest
 import com.tunegrab.app.FormatPickerSheet
 import com.tunegrab.app.FormatPrefs
+import com.tunegrab.app.security.YoutubeLinks
 import com.tunegrab.app.MainActivity
 import com.tunegrab.app.PlaylistSheet
 import com.tunegrab.app.PlayerActivity
@@ -928,10 +929,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun sanitize(name: String): String =
-        name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
-            .trim()
-            .take(80)
-            .ifBlank { "audio" }
+        com.tunegrab.app.download.DownloadHelpers.sanitizeFileName(name).take(80)
 
     private fun friendlyError(t: Throwable): String {
         // MODO DE RESGATE bloqueado TAMBÉM (YoutubeDLException do yt-dlp ou
@@ -967,6 +965,7 @@ class HomeFragment : Fragment() {
         Regex("https?://\\S+").find(binding.inputUrl.text?.toString().orEmpty())
             ?.value
             ?.trim('"', '\'', ')', '>', '<')
+            ?.let(YoutubeLinks::downloadUrl)
 
     private fun pasteFromClipboard() {
         val cm = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return

@@ -171,12 +171,14 @@ pastas TuneGrab são reencontradas pelo MediaStore.
 
 - **Trava de acesso por convite**: o app abre atrás de senha. Cada senha nasce
   de um convite e **fica presa ao aparelho** que ativou; passar a senha adiante
-  não dá acesso em outro celular
+  não dá acesso em outro celular no aplicativo oficial. A trava é local:
+  um APK modificado pode removê-la; não equivale a autorização por servidor
 - **Atualização automática**: o card de versão nova aparece no Início, com o
   changelog em texto leigo; baixar e instalar acontecem **dentro do app**, com
   barra de progresso e confirmação final do sistema. Se a consulta à API do
   GitHub falhar (rede instável ou limite de requisições), o app tenta um
-  **segundo canal** (o feed de releases) antes de desistir
+  **segundo canal** (o feed de releases) antes de desistir. Antes da instalação,
+  origem, SHA-256, pacote, versão e assinatura são conferidos
 
 ## Instalação
 
@@ -321,10 +323,10 @@ O GitHub Actions roda os testes, compila, assina e publica automaticamente a
 cada tag `v*`.
 
 > **Sobre a assinatura:** a chave de release **não fica no repositório**. Ela
-> vive nos *GitHub Secrets* e o CI assina o APK com rotação de chave (APK
-> Signature Scheme v3), de modo que quem já tem o app instalado continua
-> atualizando normalmente. Detalhes, como gerar e guardar as chaves e o que
-> fazer em caso de perda: [`docs/SIGNING.md`](docs/SIGNING.md).
+> vive nos *GitHub Secrets* e o CI assina o APK com rotação v3.1 no Android
+> 13+. Android 7–12 mantêm a chave antiga por compatibilidade: a exposição
+> dessa chave **continua sendo um risco nesses aparelhos**. Detalhes e limites:
+> [`docs/SIGNING.md`](docs/SIGNING.md) e [`revisão de segurança`](docs/SECURITY_REVIEW.md).
 
 ## O fork do NewPipeExtractor (motor de fallback)
 

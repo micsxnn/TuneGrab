@@ -1,6 +1,7 @@
 package com.tunegrab.app.yt
 
 import android.content.Context
+import com.tunegrab.app.security.YoutubeLinks
 import android.util.Log
 import com.tunegrab.app.R
 import com.tunegrab.app.YtCookies
@@ -98,6 +99,8 @@ object YtDlpEngine {
         onProcessId: (String) -> Unit = {},
         onProgress: (percent: Float, etaSeconds: Long, line: String?) -> Unit
     ): File {
+        val safeUrl = YoutubeLinks.canonicalVideoUrl(videoUrl)
+            ?: throw IllegalArgumentException("URL do YouTube não reconhecida")
         if (clean) outDir.deleteRecursively()
         outDir.mkdirs()
 
@@ -110,7 +113,10 @@ object YtDlpEngine {
         //   BAIXAM: default, visionos, tv_embedded
         //   NÃO baixam: android_vr (403 — GVS exige PO Token), mweb,
         //   web, web_embedded, ios, tv, tv_simply, web_safari (zero formatos)
-        fun buildRequest(client: String?): YoutubeDLRequest = YoutubeDLRequest(videoUrl).apply {
+        fun buildRequest(client: String?): YoutubeDLRequest = YoutubeDLRequest(safeUrl).apply {
+            addOption("--ignore-config")
+            addOption("--no-plugin-dirs")
+            addOption("--use-extractors", "youtube.*")
             addOption("--no-playlist")
             addOption("--no-mtime")
             addOption("--socket-timeout", "20")

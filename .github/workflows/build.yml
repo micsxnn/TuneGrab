@@ -2,129 +2,127 @@ name: Build APK
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches: [main]
+    tags: ['v*']
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
-# Empilhou pushes? Cancela o run antigo e compila só o último commit.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build & Publish APK
+    name: Test and build unsigned APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Histórico completo: as notas da release (que viram o changelog do
-          # card de atualização dentro do app) são geradas do log de commits.
-          fetch-depth: 0
-
+          persist-credentials: false
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
-
-      # Cacheia GRADLE_USER_HOME (dependências, wrapper e build cache).
-      # O build cache do Gradle (ligado no gradle.properties) faz a tag do
-      # mesmo commit reaproveitar as saídas compiladas pela push de origem.
-      - name: Setup Gradle (com cache)
-        uses: gradle/actions/setup-gradle@v4
-
-      # Testes de unidade (JVM, rápidos): lógica pura de acesso, letras e títulos.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Invitation generator self-test
+        run: python3 tools/passgen.py --selftest
+      - name: Native JNI regression tests
+        run: bash tools/test-native.sh
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
-
-      - name: Upload test report (se falhar)
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: unit-test-report
-          path: app/build/reports/tests/
+          name: unit-test-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
           if-no-files-found: ignore
+      - name: Upload unsigned build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/outputs/apk/release/*-unsigned.apk
+          if-no-files-found: error
+          retention-days: 3
 
-      # Push normal compila SÓ o release (é o que a gente instala).
-      # Tag compila o debug também (vai anexado na release para depurar).
-      # Sem --no-daemon: o daemon aproveita o JIT quente e o setup-gradle o encerra no fim.
-      - name: Build APKs
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            ./gradlew assembleRelease assembleDebug --stacktrace
-          else
-            ./gradlew assembleRelease --stacktrace
-          fi
-
-      # O Gradle gera o release SEM assinatura; quem assina é este passo
-      # (rotação de chave v3 — veja docs/SIGNING.md e tools/sign-release.sh).
-      - name: Sign release APK
+  sign:
+    name: Sign and verify APK (trusted runs only)
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout signing script
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up JDK 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download unsigned build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/outputs/apk/release
+      - name: Sign, verify per-API certificates and generate checksums
         env:
           OLD_KEYSTORE_B64: ${{ secrets.OLD_KEYSTORE_B64 }}
           OLD_KEYSTORE_PASS: ${{ secrets.OLD_KEYSTORE_PASS }}
           NEW_KEYSTORE_B64: ${{ secrets.NEW_KEYSTORE_B64 }}
           NEW_KEYSTORE_PASS: ${{ secrets.NEW_KEYSTORE_PASS }}
         run: bash tools/sign-release.sh app/build/outputs/apk/release
-
-      - name: Upload artifact (release)
-        uses: actions/upload-artifact@v4
+      - name: Upload verified APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: TuneGrab-APK-${{ github.sha }}
-          path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-
-      - name: Upload artifact (debug, só na tag)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
-        with:
-          name: TuneGrab-Debug-${{ github.sha }}
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-
-      - name: Rename APKs (release)
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          VERSION="${GITHUB_REF_NAME}"
-          cp app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/TuneGrab-${VERSION}.apk"
-          cp app/build/outputs/apk/debug/*.apk "app/build/outputs/apk/debug/TuneGrab-${VERSION}-debug.apk"
-
-      - name: Release notes (leigas e curtas — RELEASE_NOTES.md)
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          # v0.22.5: as notas da release NUNCA mais nascem do log de commits —
-          # elas aparecem DENTRO do app (card de atualização) e texto de dev
-          # não é pra quem usa. O RELEASE_NOTES.md no repo É a nota da
-          # release (leiga e curta, escrita na mão); sem o arquivo, cai pro
-          # formato velho de commits como fallback.
-          if [ -f RELEASE_NOTES.md ]; then
-            cp RELEASE_NOTES.md body.md
-          else
-            {
-              echo "### Novidades"
-              echo
-              PREV=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-              if [ -n "$PREV" ]; then
-                git log --format='- %s' "${PREV}..${GITHUB_REF_NAME}"
-              else
-                echo "- Primeira release pública 🎉"
-              fi
-            } > body.md
-          fi
-          echo "--- body.md ---"; cat body.md
-
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "${{ github.ref_name }} — Stable"
-          body_path: body.md
-          files: |
+          name: TuneGrab-APK-${{ github.sha }}-${{ github.run_id }}
+          path: |
             app/build/outputs/apk/release/TuneGrab-*.apk
-            app/build/outputs/apk/debug/TuneGrab-*.apk
+            app/build/outputs/apk/release/SHA256SUMS
+            app/build/outputs/apk/release/SIGNING-CERTIFICATES.txt
+            app/build/outputs/apk/release/signing.lineage
+          if-no-files-found: error
+
+  publish:
+    name: Publish verified release
+    needs: [build, sign]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release notes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download verified release
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: TuneGrab-APK-${{ github.sha }}-${{ github.run_id }}
+          path: release
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          name: "${{ github.ref_name }} — Segurança"
+          body_path: RELEASE_NOTES.md
+          fail_on_unmatched_files: true
+          files: |
+            release/TuneGrab-*.apk
+            release/SHA256SUMS
+            release/SIGNING-CERTIFICATES.txt
+            release/signing.lineage
