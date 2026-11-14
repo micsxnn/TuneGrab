@@ -145,6 +145,7 @@ dependencies {
 
     // Security maintenance for old transitive versions in youtubedl-android (keep Jackson 2.x).
     implementation(platform("com.fasterxml.jackson:jackson-bom:2.18.11"))
+    implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("commons-io:commons-io:2.20.0")
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("org.apache.commons:commons-lang3:3.18.0")
