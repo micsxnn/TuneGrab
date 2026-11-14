@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-14",
+  "scope": "Selected releaseRuntimeClasspath (JVM Maven coordinates only)",
+  "count": 172,
+  "source_run": 43591663800,
+  "findings": [
+    {
+      "package": "com.google.guava:guava",
+      "version": "33.0.0-android",
+      "advisories": [
+        "GHSA-xxph-c9ww-hj94"
+      ]
+    }
+  ]
+}

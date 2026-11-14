@@ -11,3 +11,15 @@ build/
 # Python (gerador da arte animada)
 __pycache__/
 *.pyc
+
+# Chaves de assinatura NUNCA entram no repo (veja docs/SIGNING.md)
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.lineage
+
+# Credenciais locais
+.env
+.env.*
+!.env.example

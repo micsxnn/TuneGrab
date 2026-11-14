@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <exclude domain="sharedpref" path="access_gate.xml" />
+        <exclude domain="sharedpref" path="yt_cookies.xml" />
+        <exclude domain="root" path="app_webview/" />
+        <exclude domain="file" path="cookies.txt" />
+        <exclude domain="file" path="cookies.txt.tmp" />
+        <exclude domain="file" path="cookies.txt.bak" />
+        <exclude domain="file" path="updates/" />
+        <exclude domain="external" path="updates/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="access_gate.xml" />
+        <exclude domain="sharedpref" path="yt_cookies.xml" />
+        <exclude domain="root" path="app_webview/" />
+        <exclude domain="file" path="cookies.txt" />
+        <exclude domain="file" path="cookies.txt.tmp" />
+        <exclude domain="file" path="cookies.txt.bak" />
+        <exclude domain="file" path="updates/" />
+        <exclude domain="external" path="updates/" />
+    </device-transfer>
+</data-extraction-rules>

@@ -192,6 +192,8 @@ def main():
     ap.add_argument("--quiet", action="store_true", help="não imprimir senhas (só IDs)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
+    if not 1 <= args.iters <= 1_000_000:
+        ap.error("--iters deve estar entre 1 e 1000000 (limite aceito pelo app)")
 
     if args.selftest:
         # 1) PBKDF2 manual == hashlib (garante que o Kotlin espelha o mesmo algoritmo)
@@ -233,7 +235,7 @@ def main():
         for raw_name in args.name:
             norm = normalize_name(raw_name)
             display, _ = derive_password(norm, pepper)
-            print("{}  ->  {}".format(norm, display))
+            print(slugify(norm) if args.quiet else "{}  ->  {}".format(norm, display))
         return
 
     data = load_json(args.json)
@@ -274,14 +276,15 @@ def main():
                                "hash": base64.b64encode(device_binding(dsalt, dev)).decode()}
         new_entries.append(entry)
         tag = "   [presa no aparelho {}]".format(dev) if dev else "   [SOLTA — vale em qualquer aparelho]"
-        print("{}  ->  {}   (id: {}){}".format(norm, display, entry_id, tag))
+        print(entry_id if args.quiet else "{}  ->  {}   (id: {}){}".format(norm, display, entry_id, tag))
 
     if new_entries:
         data["hashes"].extend(new_entries)
         save_json(args.json, data)
         print("\n{} entrada(s) gravada(s) em {}".format(len(new_entries), args.json))
-        print("A SENHA NUNCA VAI PRO REPO — só o hash. Guarde a senha acima AGORA")
-        print("(ou recupere depois com: --show --name \"<nome>\").")
+        if not args.quiet:
+            print("A SENHA NUNCA VAI PRO REPO — só o hash. Guarde a senha acima AGORA")
+            print("(ou recupere depois com: --show --name \"<nome>\").")
         if devices:
             print("Senha(s) com binding: SÓ destravam no aparelho do código informado —")
             print("reset de fábrica/troca de celular pede re-geração com o código novo.")

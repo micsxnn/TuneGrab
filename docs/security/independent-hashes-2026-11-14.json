@@ -1,0 +1,120 @@
+[
+  {
+    "package": "com.fasterxml.jackson.core:jackson-core",
+    "version": "2.18.11",
+    "artifact": "jackson-core-2.18.11.jar",
+    "sha256": "825fa72dfb9e2f8a642322f1390dbac22c30d15ebd6dc6b3772158821ee124eb",
+    "origin": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.18.11/jackson-core-2.18.11.jar",
+    "matched": true
+  },
+  {
+    "package": "com.fasterxml.jackson.core:jackson-databind",
+    "version": "2.18.11",
+    "artifact": "jackson-databind-2.18.11.jar",
+    "sha256": "075ad94a76c3edf83e1972dc26f476361eb6b9d0e260d93fc11105509bc79cab",
+    "origin": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.18.11/jackson-databind-2.18.11.jar",
+    "matched": true
+  },
+  {
+    "package": "commons-io:commons-io",
+    "version": "2.20.0",
+    "artifact": "commons-io-2.20.0.jar",
+    "sha256": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72",
+    "origin": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar",
+    "matched": true
+  },
+  {
+    "package": "org.apache.commons:commons-compress",
+    "version": "1.28.0",
+    "artifact": "commons-compress-1.28.0.jar",
+    "sha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca",
+    "origin": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.28.0/commons-compress-1.28.0.jar",
+    "matched": true
+  },
+  {
+    "package": "org.apache.commons:commons-lang3",
+    "version": "3.18.0",
+    "artifact": "commons-lang3-3.18.0.jar",
+    "sha256": "4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720",
+    "origin": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.18.0/commons-lang3-3.18.0.jar",
+    "matched": true
+  },
+  {
+    "package": "org.jetbrains.kotlin:kotlin-gradle-plugin",
+    "version": "2.4.21",
+    "artifact": "kotlin-gradle-plugin-2.4.21-gradle813.jar",
+    "sha256": "60eaf7b2c098d6c0e2171e5d454b3f7b95c227215dc5f831d0aeefd405e98213",
+    "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-gradle-plugin/2.4.21/kotlin-gradle-plugin-2.4.21-gradle813.jar",
+    "matched": true
+  },
+  {
+    "package": "org.json:json",
+    "version": "20260814",
+    "artifact": "json-20260814.jar",
+    "sha256": "7dd2de1533e766e2b6c07d8194da85145ad313a167a4760050f5c9b6839604fe",
+    "origin": "https://repo.maven.apache.org/maven2/org/json/json/20260814/json-20260814.jar",
+    "matched": true
+  },
+  {
+    "package": "org.jsoup:jsoup",
+    "version": "1.23.2",
+    "artifact": "jsoup-1.23.2.jar",
+    "sha256": "e9d8c856856680427f096d156f02a414289985c930998fcb519ce5be39b42003",
+    "origin": "https://repo.maven.apache.org/maven2/org/jsoup/jsoup/1.23.2/jsoup-1.23.2.jar",
+    "matched": true
+  },
+  {
+    "package": "com.google.guava:guava-parent",
+    "version": "33.0.0-android",
+    "artifact": "guava-parent-33.0.0-android.pom",
+    "sha256": "5af483b78c49de78c49faedd2a58752784a44c8363f5e25e52e297814c09177a",
+    "origin": "https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/33.0.0-android/guava-parent-33.0.0-android.pom",
+    "matched": true,
+    "purpose": "Explicitly reviewed descriptor missing from warm-cache bootstrap"
+  },
+  {
+    "package": "com.fasterxml.jackson:jackson-base",
+    "version": "2.18.11",
+    "artifact": "jackson-base-2.18.11.pom",
+    "sha256": "f0db390604b15535e42b9540dc2a4e74912a4ca73c4b2dfe88b8e6b24af18bfb",
+    "origin": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/jackson-base/2.18.11/jackson-base-2.18.11.pom",
+    "matched": true,
+    "purpose": "Explicitly reviewed descriptor missing from warm-cache bootstrap"
+  },
+  {
+    "package": "org.junit:junit-bom",
+    "version": "5.11.4",
+    "artifact": "junit-bom-5.11.4.module",
+    "sha256": "a9a4f27be94e99b9d570162d246a80f686d277d5d31aeb5481047cf51daf46e4",
+    "origin": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.11.4/junit-bom-5.11.4.module",
+    "matched": true,
+    "purpose": "Explicitly reviewed descriptor missing from warm-cache bootstrap"
+  },
+  {
+    "package": "org.junit:junit-bom",
+    "version": "5.11.4",
+    "artifact": "junit-bom-5.11.4.pom",
+    "sha256": "19d4b747b204805325b6334553296f986562277a4ac1cb5e593a5e4c4f5e4115",
+    "origin": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.11.4/junit-bom-5.11.4.pom",
+    "matched": true,
+    "purpose": "Explicitly reviewed descriptor missing from warm-cache bootstrap"
+  },
+  {
+    "package": "org.junit:junit-bom",
+    "version": "5.13.1",
+    "artifact": "junit-bom-5.13.1.module",
+    "sha256": "33c07ab9724790a6e5859ba07d69117ac530439724545a81c4179e3272c75de8",
+    "origin": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.13.1/junit-bom-5.13.1.module",
+    "matched": true,
+    "purpose": "Explicitly reviewed descriptor missing from warm-cache bootstrap"
+  },
+  {
+    "package": "org.jetbrains.kotlinx:kotlinx-serialization-bom",
+    "version": "1.5.0",
+    "artifact": "kotlinx-serialization-bom-1.5.0.pom",
+    "sha256": "b97672d01f1842bfac6c478c28200ecedd6e6f4463edb39d058c1e08619eb8dc",
+    "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-bom/1.5.0/kotlinx-serialization-bom-1.5.0.pom",
+    "matched": true,
+    "purpose": "Explicitly reviewed descriptor missing from warm-cache bootstrap"
+  }
+]

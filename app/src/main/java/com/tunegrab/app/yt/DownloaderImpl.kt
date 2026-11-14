@@ -1,5 +1,6 @@
 package com.tunegrab.app.yt
 
+import com.tunegrab.app.security.boundedText
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -24,6 +25,8 @@ object DownloaderImpl : Downloader() {
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
+        .followSslRedirects(false)
+        .callTimeout(90, TimeUnit.SECONDS)
         .build()
 
     override fun execute(request: Request): Response {
@@ -48,7 +51,7 @@ object DownloaderImpl : Downloader() {
         if (!hasUserAgent) builder.header("User-Agent", USER_AGENT)
 
         client.newCall(builder.build()).execute().use { resp ->
-            val bodyStr = resp.body?.string().orEmpty()
+            val bodyStr = resp.body?.boundedText(16 * 1024 * 1024).orEmpty()
             if (resp.code == 429) {
                 throw ReCaptchaException(
                     "Rate limit atingido pelo YouTube",

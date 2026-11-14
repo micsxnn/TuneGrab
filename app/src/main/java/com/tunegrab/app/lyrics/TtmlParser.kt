@@ -5,7 +5,11 @@ import org.w3c.dom.Node
 import java.io.StringReader
 import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.parsers.SAXParserFactory
+import org.xml.sax.Attributes
+import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.InputSource
+import org.xml.sax.SAXException
 
 /**
  * LEITOR DE TTML (o XML das letras da Apple Music).
@@ -39,8 +43,10 @@ object TtmlParser {
 
     /** Lê o documento e devolve as linhas com tempo (e sílabas, se houver). */
     fun parse(ttml: String): List<LyricLine> {
-        if (ttml.isBlank() || "<p" !in ttml.lowercase()) return emptyList()
+        if (ttml.length > 2 * 1024 * 1024 || ttml.isBlank() || "<p" !in ttml.lowercase()) return emptyList()
+        if (Regex("<!\\s*(?:DOCTYPE|ENTITY)", RegexOption.IGNORE_CASE).containsMatchIn(ttml)) return emptyList()
         return runCatching {
+            checkXmlBudget(ttml)
             val factory = DocumentBuilderFactory.newInstance().apply {
                 isNamespaceAware = false
                 runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
@@ -49,7 +55,10 @@ object TtmlParser {
                 runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
                 runCatching { isExpandEntityReferences = false }
             }
-            val document = factory.newDocumentBuilder().parse(InputSource(StringReader(ttml)))
+            val builder = factory.newDocumentBuilder().apply {
+                setEntityResolver { _, _ -> throw SAXException("entidades XML externas não são permitidas") }
+            }
+            val document = builder.parse(InputSource(StringReader(ttml)))
             // Ajuste global do relógio: a exportação TTML da Apple traz
             // <head><metadata><audio lyricOffset="…"/> que empurra TODOS os
             // tempos. Ignorar isso dessincroniza a música inteira.
@@ -84,6 +93,28 @@ object TtmlParser {
             }
             staged.sortedBy { it.timeMs }
         }.getOrDefault(emptyList())
+    }
+
+    /** Bound nesting/node count as well as bytes: later word collection is recursive. */
+    private fun checkXmlBudget(xml: String) {
+        val factory = SAXParserFactory.newInstance().apply {
+            runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+        }
+        val reader = factory.newSAXParser().xmlReader
+        reader.setEntityResolver { _, _ -> throw SAXException("entidades externas não são permitidas") }
+        reader.contentHandler = object : DefaultHandler() {
+            private var depth = 0
+            private var elements = 0
+            override fun startElement(uri: String?, local: String?, name: String?, attributes: Attributes?) {
+                if (++depth > 64 || ++elements > 32_768 || (attributes?.length ?: 0) > 128) {
+                    throw SAXException("complexidade XML excede o limite permitido")
+                }
+            }
+            override fun endElement(uri: String?, local: String?, name: String?) { depth-- }
+        }
+        reader.parse(InputSource(StringReader(xml)))
     }
 
     /**

@@ -18,8 +18,8 @@ android {
         applicationId = "com.tunegrab.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 100
-        versionName = "0.22.27"
+        versionCode = 101
+        versionName = "0.22.28"
 
         // ABIs do motor yt-dlp embutido (python + ffmpeg são nativos).
         // x86/x86_64 ficam de fora para o APK não dobrar de tamanho —
@@ -29,19 +29,19 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("keystore/tunegrab.keystore")
-            storePassword = "tunegrab2025"
-            keyAlias = "tunegrab"
-            keyPassword = "tunegrab2025"
-        }
-    }
-
+    // A assinatura do release NÃO mora mais no código: o APK sai sem assinar daqui
+    // e o CI assina com o apksigner (chave + linhagem de rotação vêm dos Secrets
+    // do GitHub). Veja docs/SIGNING.md. Debug continua com a chave de debug padrão.
     buildTypes {
         release {
+            // Release de segurança: preservar o comportamento de reflexão/JNI.
+            // As regras do R8 ficam prontas, mas encolhimento não é ativado sem teste em aparelho.
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -89,6 +89,14 @@ android {
     lint {
         abortOnError = false
     }
+
+    testOptions {
+        unitTests {
+            // android.util.Log etc. devolvem valor padrão em vez de explodir
+            // nos testes de JVM (a lógica testada é pura, isto é só rede de segurança).
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 // DSL novo do Kotlin 2.x (o kotlinOptions antigo saiu do Kotlin 2.4).
@@ -99,7 +107,7 @@ kotlin {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -130,8 +138,18 @@ dependencies {
     //  3) suporte completo a PoTokenProvider: player request WEB com PoToken (destrava o
     //     bot-check "Sign in to confirm you're not a bot"), client iOS com PoToken e
     //     WEB+PoToken/iOS/visionOS/TV como fallback primário quando os clients anônimos falham.
+    // JitPack blocks the renamed-owner coordinate (401). Exact binary/POM hashes are locked
+    // in gradle/verification-metadata.xml; never bypass verification to refresh this artifact.
     implementation("com.github.MicaelSanPedro:NewPipeExtractor:v0.26.5-android4")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Security maintenance for old transitive versions in youtubedl-android (keep Jackson 2.x).
+    implementation(platform("com.fasterxml.jackson:jackson-bom:2.18.11"))
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("commons-io:commons-io:2.20.0")
+    implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation("org.apache.commons:commons-lang3:3.18.0")
+
 
     // Motor de download yt-dlp EMBUTIDO no APK (python 3.12 + yt-dlp + ffmpeg),
     // a mesma engine usada pelo app Seal — o “plano A” do download na v0.4.0.
@@ -191,5 +209,29 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.12.0")
 
     // Parser HTML — raspagem das fontes de letra (Genius).
-    implementation("org.jsoup:jsoup:1.18.3")
+    implementation("org.jsoup:jsoup:1.23.2")
+}
+
+// Testes de unidade (JVM, sem aparelho): lógica pura do app.
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    // O org.json do android.jar é só um stub nos testes de JVM.
+    testImplementation("org.json:json:20260814")
+}
+
+// Export only the selected APK runtime graph; verification metadata also contains build/test tools.
+tasks.register("securityRuntimeDependencies") {
+    notCompatibleWithConfigurationCache("one-shot dependency audit report")
+    val runtime = configurations.named("releaseRuntimeClasspath")
+    val destination = layout.buildDirectory.file("reports/security/runtime-dependencies.txt")
+    outputs.file(destination)
+    doLast {
+        val coordinates = runtime.get().resolvedConfiguration.resolvedArtifacts
+            .map { "${it.moduleVersion.id.group}:${it.moduleVersion.id.name}:${it.moduleVersion.id.version}" }
+            .distinct().sorted()
+        destination.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(coordinates.joinToString("\n", postfix = "\n"))
+        }
+    }
 }

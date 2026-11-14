@@ -171,12 +171,14 @@ pastas TuneGrab são reencontradas pelo MediaStore.
 
 - **Trava de acesso por convite**: o app abre atrás de senha. Cada senha nasce
   de um convite e **fica presa ao aparelho** que ativou; passar a senha adiante
-  não dá acesso em outro celular
+  não dá acesso em outro celular no aplicativo oficial. A trava é local:
+  um APK modificado pode removê-la; não equivale a autorização por servidor
 - **Atualização automática**: o card de versão nova aparece no Início, com o
   changelog em texto leigo; baixar e instalar acontecem **dentro do app**, com
   barra de progresso e confirmação final do sistema. Se a consulta à API do
   GitHub falhar (rede instável ou limite de requisições), o app tenta um
-  **segundo canal** (o feed de releases) antes de desistir
+  **segundo canal** (o feed de releases) antes de desistir. Antes da instalação,
+  origem, SHA-256, pacote, versão e assinatura são conferidos
 
 ## Instalação
 
@@ -312,17 +314,25 @@ som de carro. Para máxima fidelidade sem reconversão, escolha **M4A** ou
 Requisitos: JDK 17, Android SDK 37 e NDK/CMake (o Gradle baixa o que faltar).
 
 ```bash
-./gradlew assembleRelease   # APK assinado em app/build/outputs/apk/release/
-./gradlew assembleDebug     # APK de debug
+./gradlew assembleDebug --dependency-verification strict        # APK de debug (assinado com a chave de debug padrão)
+./gradlew assembleRelease --dependency-verification strict      # APK de release SEM assinatura (o CI assina)
+./gradlew testDebugUnitTest --dependency-verification strict    # testes de unidade (JVM, sem aparelho)
 ```
 
-O GitHub Actions compila e publica automaticamente a cada tag `v*`.
+O GitHub Actions roda os testes, compila, assina e publica automaticamente a
+cada tag `v*`.
 
-> **Nota sobre a assinatura:** o keystore de release (`app/keystore/`) está
-> commitado com senha pública de propósito, para garantir builds reprodutíveis
-> que se atualizam entre versões. É uma escolha aceitável para um app gratuito
-> e sem dados sensíveis; para uso comercial, mova o keystore para *GitHub
-> Secrets*.
+Os hashes dos artefatos estão em `gradle/verification-metadata.xml`; o build
+falha se uma dependência mudar. Não use `--write-verification-metadata` nem
+desative a verificação para contornar uma falha sem revisar o artefato. Veja
+[`docs/DEPENDENCY_SECURITY.md`](docs/DEPENDENCY_SECURITY.md).
+
+> **Sobre a assinatura:** a chave atual não é versionada. A chave antiga
+> comprometida ainda pode ser recuperada do histórico público. A chave atual
+> vive nos *GitHub Secrets* e o CI assina o APK com rotação v3.1 no Android
+> 13+. Android 7–12 mantêm a chave antiga por compatibilidade: a exposição
+> dessa chave **continua sendo um risco nesses aparelhos**. Detalhes e limites:
+> [`docs/SIGNING.md`](docs/SIGNING.md) e [`revisão de segurança`](docs/SECURITY_REVIEW.md).
 
 ## O fork do NewPipeExtractor (motor de fallback)
 
@@ -402,6 +412,7 @@ versão oficial.
 - [x] **Download da atualização não desiste mais na troca de seção: o aviso de versão nova continua o download no escopo do app e reaparece no ponto em que parou** (v0.22.25)
 - [x] **Player de vídeo com movimento: controles entram e saem deslizando, o play gira ao virar pause, os botões respondem ao toque, a barra desliza sem saltos e o disco dourado ganhou brilho** (v0.22.26)
 - [x] **Aviso de versão nova: o card não troca de release no meio do download e o registro de diagnóstico temporário saiu do app** (v0.22.27)
+- [x] **Revisão de segurança: rotação da assinatura, atualizador validado, proteção de cookies/backup, caminhos/XML/JNI e dependências verificadas** (v0.22.28)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

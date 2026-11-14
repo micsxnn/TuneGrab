@@ -1,6 +1,7 @@
 package com.tunegrab.app.yt.potoken
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -8,6 +9,12 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebSettings
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import com.tunegrab.app.security.YoutubeLinks
+import com.tunegrab.app.security.boundedText
+import java.io.ByteArrayInputStream
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -106,6 +113,7 @@ object PoTokenManager {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .writeTimeout(20, TimeUnit.SECONDS)
+        .followSslRedirects(false)
         .build()
 
     fun init(context: Context) {
@@ -227,7 +235,8 @@ object PoTokenManager {
         Log.d(TAG, "sessão nova: visitorData=${vd.take(16)}… clientVersion=${optString(ytcfg, "INNERTUBE_CLIENT_VERSION")}")
 
         // 2. interpreter JavaScript do BotGuard
-        val interpreterUrl = challenge.interpreterUrl
+        val interpreterUrl = YoutubeLinks.botguardInterpreterUrl(challenge.interpreterUrl)
+            ?: throw PoTokenException("origem do interpretador BotGuard não permitida")
         val interpreterJs = httpGetText(
             if (interpreterUrl.startsWith("https:")) interpreterUrl else "https:$interpreterUrl",
             referer = "https://www.youtube.com/"
@@ -269,6 +278,7 @@ object PoTokenManager {
             val latch = CountDownLatch(1)
             mainHandler.post {
                 try {
+                    wv.removeJavascriptInterface("TgPoInterface")
                     wv.loadUrl("about:blank")
                     wv.onPause()
                     wv.removeAllViews()
@@ -307,9 +317,28 @@ object PoTokenManager {
                 wv.settings.javaScriptEnabled = true
                 wv.settings.userAgentString = DESKTOP_UA
                 wv.settings.blockNetworkLoads = true // a página não precisa de rede
+                wv.settings.allowFileAccess = false
+                wv.settings.allowContentAccess = false
+                @Suppress("DEPRECATION")
+                wv.settings.allowFileAccessFromFileURLs = false
+                @Suppress("DEPRECATION")
+                wv.settings.allowUniversalAccessFromFileURLs = false
+                wv.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                wv.settings.domStorageEnabled = false
+                wv.settings.javaScriptCanOpenWindowsAutomatically = false
+                wv.settings.setGeolocationEnabled(false)
+                if (Build.VERSION.SDK_INT >= 26) wv.settings.safeBrowsingEnabled = true
                 wv.addJavascriptInterface(Bridge(), "TgPoInterface")
                 wv.webChromeClient = object : WebChromeClient() {}
                 wv.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = true
+
+                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                        return if (request.url.scheme in setOf("http", "https", "file", "content")) {
+                            WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+                        } else null
+                    }
+
                     override fun onPageFinished(view: WebView?, url: String?) {
                         pageLoaded.countDown()
                     }
@@ -401,7 +430,7 @@ object PoTokenManager {
         if (referer != null) builder.header("Referer", referer)
         httpClient.newCall(builder.build()).execute().use { resp ->
             if (resp.code != 200) throw PoTokenException("HTTP ${resp.code} em $url")
-            return resp.body?.string() ?: throw PoTokenException("resposta vazia de $url")
+            return resp.body?.boundedText(8 * 1024 * 1024) ?: throw PoTokenException("resposta vazia de $url")
         }
     }
 
@@ -417,7 +446,7 @@ object PoTokenManager {
             .build()
         httpClient.newCall(req).execute().use { resp ->
             if (resp.code != 200) throw PoTokenException("GenerateIT HTTP ${resp.code}")
-            val arr = JSONArray(resp.body?.string() ?: "[]")
+            val arr = JSONArray(resp.body?.boundedText(256 * 1024) ?: "[]")
             val token = arr.optString(0, "")
             if (token.isEmpty()) throw PoTokenException("integrity token vazio")
             return token to arr.optLong(1, 43_200L)

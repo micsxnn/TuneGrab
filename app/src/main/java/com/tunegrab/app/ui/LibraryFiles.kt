@@ -16,6 +16,7 @@ import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import com.tunegrab.app.R
 import com.tunegrab.app.download.SaveLocation
+import com.tunegrab.app.security.StoragePaths
 import java.io.File
 
 /** Um arquivo salvo pelo TuneGrab, de qualquer uma das 3 fontes de listagem. */
@@ -347,7 +348,7 @@ object LibraryFiles {
     private fun legacyDir(dir: File): List<LibraryEntry> {
         if (!dir.isDirectory) return emptyList()
         return dir.listFiles()
-            ?.filter { it.isFile && !it.name.startsWith(".") }
+            ?.filter { it.isFile && !it.name.startsWith(".") && StoragePaths.resolve(dir, it.name) != null }
             ?.map {
                 val mime = mimeOf(it.name)
                 LibraryEntry(
@@ -404,22 +405,11 @@ object LibraryFiles {
      * outro app devolve false (não é nossa pra tocar por caminho).
      */
     fun deleteViaFile(ctx: Context, e: LibraryEntry): Boolean {
-        if (!e.fromTuneGrab) return false
+        if (!e.fromTuneGrab || !StoragePaths.isName(e.name)) return false
         val root = LibraryFolders.defaultRoot()
         val candidate: File? = when {
             e.file != null -> e.file
-            e.folder != null -> {
-                var dir: File = root
-                var reached = true
-                for (seg in e.folder.split('/')) {
-                    dir = File(dir, seg)
-                    if (!dir.isDirectory) {
-                        reached = false
-                        break
-                    }
-                }
-                if (reached) File(dir, e.name) else null
-            }
+            e.folder != null -> StoragePaths.resolve(root, e.folder)?.let { File(it, e.name) }
             else -> File(root, e.name)
         }
         val target = candidate?.takeIf { it.isFile } ?: return false

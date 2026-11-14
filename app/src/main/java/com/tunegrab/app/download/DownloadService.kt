@@ -488,6 +488,7 @@ class DownloadService : Service() {
         var tmpOut: File? = null
         var tmpPart: File? = null
         try {
+            if (fileName != DownloadHelpers.sanitizeFileName(fileName)) throw IOException("nome de arquivo inválido")
             checkStop()
 
             // ---------- PLANO A: yt-dlp embutido ----------
@@ -570,7 +571,7 @@ class DownloadService : Service() {
                 checkStop()
 
                 showPhase(fileName, getString(R.string.notif_phase_save), 99, indeterminate = true)
-                publish(mp3.inputStream().buffered(), mp3.length(), fileName, "audio/mpeg")
+                publish(mp3, fileName, "audio/mpeg")
             } else {
                 val parts = File(applicationContext.cacheDir, "parts").apply { mkdirs() }
                 val part = File(parts, "$fileName.${legacyUrl.hashCode().toString(36)}.part")
@@ -584,7 +585,7 @@ class DownloadService : Service() {
                         showPhase(
                             fileName,
                             getString(R.string.notif_phase_download),
-                            pct(done, total),
+                            DownloadHelpers.percent(done, total),
                             indeterminate = total <= 0,
                             speed = speedText()
                         )
@@ -593,7 +594,7 @@ class DownloadService : Service() {
                 checkStop()
 
                 showPhase(fileName, getString(R.string.notif_phase_save), 99, indeterminate = true)
-                publish(part.inputStream().buffered(), part.length(), fileName, mime)
+                publish(part, fileName, mime)
             }
             notifyFinished(title, fileName, savedUri)
         } catch (e: DownloadPaused) {
@@ -726,7 +727,7 @@ class DownloadService : Service() {
 
             showPhase(fileName, getString(R.string.notif_phase_save), 99, indeterminate = true)
             checkStop()
-            val finalName = sanitizeFileName(produced.name)
+            val finalName = DownloadHelpers.sanitizeFileName(produced.name)
             val finalMime = when (produced.extension.lowercase()) {
                 "mp3" -> "audio/mpeg"
                 "m4a" -> "audio/mp4"
@@ -737,7 +738,7 @@ class DownloadService : Service() {
                 "mkv" -> "video/x-matroska"
                 else -> "application/octet-stream"
             }
-            val saved = publish(produced.inputStream().buffered(), produced.length(), finalName, finalMime)
+            val saved = publish(produced, finalName, finalMime)
             return saved to qualityNote
         } finally {
             // pausa preserva os parciais no dir estável para a retomada continuar;
@@ -750,9 +751,6 @@ class DownloadService : Service() {
             if (!pauseRequested && !destroyingWithPendingWork) outDir.deleteRecursively()
         }
     }
-
-    private fun sanitizeFileName(name: String): String =
-        name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "audio" }
 
     override fun onDestroy() {
         // v0.22.18: o download NÃO pode morrer quando o app é fechado dos
@@ -935,8 +933,7 @@ class DownloadService : Service() {
 
     /** Publica o arquivo final: na pasta escolhida (se houver) ou em Downloads/TuneGrab. */
     private fun publish(
-        input: InputStream,
-        total: Long,
+        source: File,
         fileName: String,
         mime: String,
         onProgress: (Long) -> Unit = {}
@@ -946,15 +943,14 @@ class DownloadService : Service() {
         val tree = SaveLocation.customTree(applicationContext)
         if (tree != null) {
             try {
-                return saveToTree(input, tree, fileName, mime, onProgress)
+                return source.inputStream().buffered().use { saveToTree(it, tree, fileName, mime, onProgress) }
             } catch (e: Exception) {
                 Log.w(TAG, "Falha ao salvar na pasta escolhida; usando o padrão", e)
             }
         }
-        return if (Build.VERSION.SDK_INT >= 29) {
-            saveViaMediaStore(input, fileName, mime, onProgress)
-        } else {
-            saveLegacy(input, fileName, onProgress)
+        return source.inputStream().buffered().use { input ->
+            if (Build.VERSION.SDK_INT >= 29) saveViaMediaStore(input, fileName, mime, onProgress)
+            else saveLegacy(input, fileName, onProgress)
         }
     }
 
@@ -1029,7 +1025,7 @@ class DownloadService : Service() {
             "TuneGrab"
         )
         if (!dir.exists() && !dir.mkdirs()) throw IOException("não foi possível criar a pasta")
-        val target = uniqueFile(dir, fileName)
+        val target = DownloadHelpers.uniqueFile(dir, fileName)
         try {
             target.outputStream().use { out -> copy(input, out, onProgress) }
             MediaScannerConnection.scanFile(applicationContext, arrayOf(target.absolutePath), null, null)
@@ -1038,20 +1034,6 @@ class DownloadService : Service() {
             throw e
         }
         return Uri.fromFile(target)
-    }
-
-    private fun uniqueFile(dir: File, fileName: String): File {
-        var candidate = File(dir, fileName)
-        if (!candidate.exists()) return candidate
-        val base = fileName.substringBeforeLast('.')
-        val ext = fileName.substringAfterLast('.', "")
-        var i = 1
-        while (candidate.exists()) {
-            val name = if (ext.isBlank()) "$base ($i)" else "$base ($i).$ext"
-            candidate = File(dir, name)
-            i++
-        }
-        return candidate
     }
 
     private fun copy(input: InputStream, out: OutputStream, onProgress: (Long) -> Unit) {
@@ -1256,9 +1238,6 @@ class DownloadService : Service() {
         "?"
     }
 
-    private fun pct(done: Long, total: Long): Int =
-        if (total > 0) ((done * 100) / total).toInt().coerceIn(0, 100) else 0
-
     // ---------- velocidade ----------
 
     private fun resetSpeed() {
@@ -1287,19 +1266,8 @@ class DownloadService : Service() {
     private fun speedText(): String? = if (speedBps > 0) formatSpeed(speedBps) else null
 
     /** Velocidade no texto do yt-dlp: "[download] 45.3% of 123MiB at 2.35MiB/s ETA 01:23". */
-    private fun speedFromLine(line: String?): String? {
-        if (line.isNullOrBlank()) return null
-        val m = SPEED_REGEX.find(line) ?: return null
-        val v = m.groupValues[1].toFloatOrNull() ?: return null
-        if (v <= 0f) return null
-        val mult = when (m.groupValues[2]) {
-            "K" -> 1024f
-            "M" -> 1024f * 1024f
-            "G" -> 1024f * 1024f * 1024f
-            else -> 1f
-        }
-        return formatSpeed((v * mult).toLong())
-    }
+    private fun speedFromLine(line: String?): String? =
+        DownloadHelpers.parseSpeedBytesPerSec(line)?.let { formatSpeed(it) }
 
     private fun formatSpeed(bps: Long): String =
         Formatter.formatShortFileSize(applicationContext, bps) + "/s"
@@ -1326,9 +1294,6 @@ class DownloadService : Service() {
         private const val RC_CANCEL = 12
         private const val RC_RESUME = 13
         private const val RC_OPEN = 14
-
-        /** "at 2.35MiB/s" na linha de progresso do yt-dlp (velocidade do plano A). */
-        private val SPEED_REGEX = Regex("at\\s+([\\d.]+)\\s*([KMGT]?)iB/s")
 
         /** Plano A: URL do vídeo para o motor yt-dlp embutido + preset de formato. */
         const val EXTRA_VIDEO_URL = "video_url"

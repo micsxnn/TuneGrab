@@ -1,6 +1,7 @@
 package com.tunegrab.app.update
 
 import android.content.Context
+import com.tunegrab.app.security.boundedText
 import com.tunegrab.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,7 +54,8 @@ object UpdateChecker {
         val notes: String,     // corpo da release (changelog)
         val url: String,       // html_url da release
         val apkUrl: String = "",  // asset .apk instalável (sem o -debug)
-        val apkSize: Long = 0L    // tamanho em bytes (0 = desconhecido)
+        val apkSize: Long = 0L,   // tamanho em bytes (0 = desconhecido)
+        val apkSha256: String = "" // GitHub asset digest; Atom resolves SHA256SUMS at download time
     )
 
     // ROTA 1 (PRINCIPAL): feed releases.atom do github.com — sem rate limit
@@ -86,6 +88,8 @@ object UpdateChecker {
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        .followSslRedirects(false)
         .build()
 
     /**
@@ -162,16 +166,17 @@ object UpdateChecker {
             .build()
         http.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) return null
-            val json = JSONObject(resp.body?.string() ?: return null)
+            val json = JSONObject(resp.body?.boundedText(2 * 1024 * 1024) ?: return null)
 
             val version = json.optString("tag_name", "").trim()
                 .removePrefix("v").removePrefix("V").trim()
             val url = json.optString("html_url", "").trim()
             val notes = json.optString("body", "").trim()
-            if (version.isBlank() || url.isBlank()) return null
+            if (!UpdatePolicy.isRelease(url, version) || json.optBoolean("draft") || json.optBoolean("prerelease")) return null
 
-            val (apkUrl, apkSize) = findApkAsset(json)
-            UpdateInfo(version, notes, url, apkUrl, apkSize)
+            val asset = findApkAsset(json)
+            if (asset.url.isBlank()) return null
+            UpdateInfo(version, notes, url, asset.url, asset.size, asset.sha256)
         }
     } catch (t: Throwable) {
         null
@@ -186,7 +191,7 @@ object UpdateChecker {
             .url(ATOM).header("User-Agent", USER_AGENT).build()
         http.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) return null
-            val xml = resp.body?.string() ?: return null
+            val xml = resp.body?.boundedText(2 * 1024 * 1024) ?: return null
 
             val entryRegex = Regex("<entry>(.*?)</entry>", RegexOption.DOT_MATCHES_ALL)
             val tagRegex = Regex("releases/tag/(v?[0-9][^\"<&?]+)")
@@ -206,7 +211,7 @@ object UpdateChecker {
                 val e = entry.groupValues[1]
                 val tag = tagRegex.find(e)?.groupValues?.get(1)?.trim() ?: continue
                 val version = tag.removePrefix("v").removePrefix("V").trim()
-                if (version.isBlank()) continue
+                if (!UpdatePolicy.isVersion(version)) continue
                 val title = titleRegex.find(e)?.groupValues?.get(1)?.trim() ?: ""
                 if (preRelease.containsMatchIn(title)) continue
 
@@ -216,7 +221,7 @@ object UpdateChecker {
                 // APK com o nome determinístico do CI; tamanho 0 = desconhecido
                 // (o instalador lida: usa o content-length da resposta real).
                 // Se um dia esse link der 404, o UpdateInstaller pede o link
-                // DE VERDADE à API (resolveApkUrl) e tenta de novo.
+                // DE VERDADE à API (resolveApkInfo) e tenta de novo.
                 val apkUrl =
                     "https://github.com/micsxnn/TuneGrab/releases/download/$tag/TuneGrab-$tag.apk"
                 return UpdateInfo(version, notes, url, apkUrl, 0L)
@@ -242,46 +247,41 @@ object UpdateChecker {
      *
      * Chamada SÓ no 404: uma requisição rara, nunca no caminho normal.
      */
-    suspend fun resolveApkUrl(info: UpdateInfo): String? = withContext(Dispatchers.IO) {
-        // a tag vem da URL da release (o nome EXATO, com ou sem "v")
-        val tag = info.url.substringAfterLast("/releases/tag/", "").trim()
-        if (tag.isBlank()) return@withContext null
+    suspend fun resolveApkInfo(info: UpdateInfo): UpdateInfo? = withContext(Dispatchers.IO) {
+        if (!UpdatePolicy.isRelease(info.url, info.version)) return@withContext null
+        val tag = UpdatePolicy.releaseTag(info.url) ?: return@withContext null
         try {
-            val request = Request.Builder()
-                .url("$API_TAGS/$tag")
+            val request = Request.Builder().url("$API_TAGS/$tag")
                 .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", USER_AGENT)
-                .build()
-            http.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                val json = JSONObject(resp.body?.string() ?: return@withContext null)
-                findApkAsset(json).first.takeIf { it.isNotBlank() }
+                .header("User-Agent", USER_AGENT).build()
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val json = JSONObject(response.body?.boundedText(2 * 1024 * 1024) ?: return@withContext null)
+                val version = json.optString("tag_name").removePrefix("v").removePrefix("V")
+                if (version != info.version || json.optBoolean("draft") || json.optBoolean("prerelease")) return@withContext null
+                val asset = findApkAsset(json)
+                if (asset.url.isBlank()) return@withContext null
+                info.copy(apkUrl = asset.url, apkSize = asset.size, apkSha256 = asset.sha256)
             }
-        } catch (t: Throwable) {
+        } catch (_: Exception) {
             null
         }
     }
 
-    /** Acha o APK instalável entre os assets (TuneGrab-vX.apk — o -debug
-     *  fica de fora). Devolve (url, tamanho em bytes). */
-    private fun findApkAsset(json: JSONObject): Pair<String, Long> {
-        var apkUrl = ""
-        var apkSize = 0L
-        val assets = json.optJSONArray("assets")
-        if (assets != null) {
-            for (i in 0 until assets.length()) {
-                val a = assets.optJSONObject(i) ?: continue
-                val name = a.optString("name", "")
-                if (name.endsWith(".apk") && name.startsWith("TuneGrab-")
-                    && !name.contains("debug")
-                ) {
-                    apkUrl = a.optString("browser_download_url", "")
-                    apkSize = a.optLong("size", 0L)
-                    break
-                }
-            }
+    private data class ApkAsset(val url: String = "", val size: Long = 0, val sha256: String = "")
+
+    private fun findApkAsset(json: JSONObject): ApkAsset {
+        val version = json.optString("tag_name").removePrefix("v").removePrefix("V")
+        val assets = json.optJSONArray("assets") ?: return ApkAsset()
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            val url = asset.optString("browser_download_url", "")
+            val size = asset.optLong("size", 0)
+            if (!UpdatePolicy.isApkUrl(url, version) || size !in 1..UpdatePolicy.MAX_APK_BYTES) continue
+            val sha = asset.optString("digest", "").removePrefix("sha256:")
+            return ApkAsset(url, size, sha.takeIf(UpdatePolicy::isSha256).orEmpty())
         }
-        return apkUrl to apkSize
+        return ApkAsset()
     }
 
     /** O content do atom vem com o corpo da release já RENDERIZADO em HTML
@@ -358,9 +358,11 @@ object UpdateChecker {
                 o.optString("notes", ""),
                 o.getString("url"),
                 o.optString("apkUrl", ""),
-                o.optLong("apkSize", 0L)
+                o.optLong("apkSize", 0L),
+                o.optString("apkSha256", "")
             )
-            if (info.version == dismissed) null else info
+            if (info.version == dismissed || !UpdatePolicy.isRelease(info.url, info.version) ||
+                !UpdatePolicy.isApkUrl(info.apkUrl, info.version) || info.apkSize !in 0..UpdatePolicy.MAX_APK_BYTES) null else info
         } catch (t: Throwable) {
             null
         }
@@ -372,6 +374,7 @@ object UpdateChecker {
         put("url", i.url)
         put("apkUrl", i.apkUrl)
         put("apkSize", i.apkSize)
+        put("apkSha256", i.apkSha256)
     }.toString()
 
     /** versionName instalado, ex.: "0.10.6". */

@@ -2,7 +2,7 @@ package com.tunegrab.app.yt
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import android.net.Uri
+import com.tunegrab.app.security.YoutubeLinks
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.localization.Localization
@@ -174,30 +174,9 @@ object YtExtractor {
      * handler aceita e a canonicalização por segmento não se aplica.
      */
     private fun normalize(url: String): String {
-        val trimmed = url.trim().trim('"', '\'', '>', '<')
-        val withScheme = if (trimmed.startsWith("http")) trimmed else "https://$trimmed"
-        return canonicalVideoUrl(withScheme) ?: withScheme
-    }
-
-    /** Link de vídeo canônico a partir de watch?v=, youtu.be/ID ou
-     *  /shorts/ID — null quando não é dessas formas (URL segue como está). */
-    private fun canonicalVideoUrl(url: String): String? = try {
-        val u = Uri.parse(url)
-        val segments = u.pathSegments
-        when {
-            u.path == "/watch" ->
-                u.getQueryParameter("v")?.takeIf { it.isNotBlank() }
-                    ?.let { "https://www.youtube.com/watch?v=$it" }
-            (u.host ?: "").lowercase() == "youtu.be" ->
-                segments.firstOrNull()?.takeIf { it.isNotBlank() }
-                    ?.let { "https://www.youtube.com/watch?v=$it" }
-            u.path?.startsWith("/shorts/") == true ->
-                segments.getOrNull(1)?.takeIf { it.isNotBlank() }
-                    ?.let { "https://www.youtube.com/watch?v=$it" }
-            else -> null
-        }
-    } catch (t: Throwable) {
-        null
+        val safe = YoutubeLinks.downloadUrl(url.trim().trim('"', '\'', '>', '<'))
+            ?: throw IllegalArgumentException("URL do YouTube não reconhecida")
+        return YoutubeLinks.canonicalVideoUrl(safe) ?: safe
     }
 
     /**
@@ -250,26 +229,9 @@ object YtExtractor {
     /** URL de playlist PURA (youtube.com/playlist?list=…). Link de vídeo com
      *  list= no bolso (watch?v=X&list=Y) NÃO entra — continua baixando o
      *  vídeo único de sempre, sem mudar nada no fluxo atual. */
-    fun isPlaylistUrl(raw: String): Boolean = try {
-        val u = Uri.parse(raw.trim())
-        u.path?.endsWith("/playlist") == true &&
-            !u.getQueryParameter("list").isNullOrBlank()
-    } catch (t: Throwable) {
-        false
-    }
+    fun isPlaylistUrl(raw: String): Boolean = YoutubeLinks.isPlaylistUrl(raw)
 
-    /**
-     * ID de playlist embutido em QUALQUER link (watch?v=X&list=Y,
-     * youtu.be/X?list=Y, /playlist?list=Y…). null quando o link não carrega
-     * list= — é vídeo puro. Usado pelo seletor Vídeo/Playlist do Início
-     * (v0.14.0): no modo Playlist, um link de vídeo com lista no bolso vira
-     * a playlist inteira sem o usuário precisar caçar o link /playlist.
-     */
-    fun playlistIdOf(raw: String): String? = try {
-        Uri.parse(raw.trim()).getQueryParameter("list")?.takeIf { it.isNotBlank() }
-    } catch (t: Throwable) {
-        null
-    }
+    fun playlistIdOf(raw: String): String? = YoutubeLinks.playlistIdOf(raw)
 
     /**
      * Busca os metadados da playlist (título, canal, itens). Só LISTA —

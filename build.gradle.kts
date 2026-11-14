@@ -16,7 +16,8 @@ plugins {
     // do LastWave-Native, exigida pelas bibliotecas que entraram no app
     // (Backdrop 2.0.1 é Compose Multiplatform com stdlib 2.4.10).
     id("com.android.application") version "9.1.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.4.10" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.10" apply false
+    // 2.4.21 closes unsafe build-cache deserialization (GHSA-r937-wjx7-w2jp).
+    id("org.jetbrains.kotlin.android") version "2.4.21" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.21" apply false
 }
