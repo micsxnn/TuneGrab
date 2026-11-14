@@ -33,7 +33,18 @@ Secrets necessários, todos com alias `tunegrab`:
 
 O diretório temporário tem permissões restritas e é removido também em falhas. Chaves/senhas não são anexadas aos artifacts. A linhagem e as impressões digitais são públicas por natureza e podem acompanhar a release.
 
-Antes de publicar, o CI valida os certificados efetivamente selecionados para APIs 24–27, 28–32 e 33+, e gera `SHA256SUMS`. A permissão de rollback do certificado antigo é desativada na linhagem.
+Antes de publicar, o CI valida criptograficamente os certificados efetivamente selecionados para APIs 24–27, 28–32 e 33–37, o pacote, a versão, a ausência de `debuggable` e gera `SHA256SUMS`. A linhagem embutida precisa corresponder à linhagem pública e conter exatamente a sucessão esperada. A permissão de rollback do certificado antigo é desativada.
+
+Impressões SHA-256 públicas, também fixadas no script para impedir troca silenciosa de Secrets:
+
+```text
+Antiga: 092f92927585924b3825d9fb5814ec445e10cbeabc6330ad841702bb45954261
+Nova:   40ccf31b39211291c1172332e041aa8ec73c126a7b99df445e064fcd2d53a865
+```
+
+A antiga foi conferida no APK oficial v0.22.26, e a nova no artifact de migração já existente e no APK real do run 43591663800. Nenhuma chave privada nova foi lida ou exportada. `tools/VerifySigning.java` usa a API do `apksig`, não parsing das linhas `Signer #1`: no formato v3.1 a CLI imprime signers distintos por faixa de SDK.
+
+Se um APK experimental do PR #1 já foi instalado no Android 9–12 usando rotação na API 28, não presuma que a política API 33 atual permita atualizar esse teste. Isso exige um APK de manutenção específico com a identidade já instalada; não use desinstalação ou rollback da chave como primeira tentativa de correção.
 
 **Backup:** guarde a nova chave, sua senha e a linhagem em um cofre sob controle do proprietário. Os valores de Secrets não podem ser lidos de volta pela API. Esta revisão não extraiu nem substituiu a chave nova existente.
 

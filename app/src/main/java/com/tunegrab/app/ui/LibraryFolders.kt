@@ -148,7 +148,7 @@ object LibraryFolders {
     }
 
     private fun joinKey(parent: String, name: String): String =
-        if (parent.isEmpty()) name else "$parent/$name"
+        if (StoragePaths.isRoot(parent)) name else "$parent/$name"
 
     /**
      * Sanitiza o nome digitado: espaços colapsados, sem "/" nem "\", sem
@@ -270,7 +270,7 @@ object LibraryFolders {
                 // [""] e a raiz entrava como "pasta" de chave vazia — linha
                 // SEM NOME no diálogo de mover (micaelsan: "tem uma pasta sem
                 // nome nas minhas pastas"). A raiz não é pasta: não entra.
-                if (k.isEmpty()) continue
+                if (StoragePaths.isRoot(k)) continue
                 // "A/B" implica que "A" existe: a cadeia de pais entra junto
                 val segs = k.split('/')
                 var acc = ""
@@ -290,7 +290,7 @@ object LibraryFolders {
      *  cheia ("A/B" sob "A" → "A/B"). Não-descendente → null. */
     private fun childOf(parent: String, key: String): String? = when {
         key == parent -> null
-        parent.isEmpty() -> key
+        StoragePaths.isRoot(parent) -> key
         key.startsWith("$parent/") -> key.removePrefix("$parent/")
         else -> null
     }
@@ -332,7 +332,7 @@ object LibraryFolders {
         if (!StoragePaths.isKey(key)) return null
         var dir = SaveLocation.customTree(ctx)
             ?.let { DocumentFile.fromTreeUri(ctx, it) } ?: return null
-        if (key.isNotEmpty()) {
+        if (!StoragePaths.isRoot(key)) {
             for (seg in key.split('/')) {
                 dir = dir.findFile(seg)?.takeIf { it.isDirectory } ?: return null
             }
@@ -388,7 +388,7 @@ object LibraryFolders {
      */
     fun moveFolder(ctx: Context, key: String, targetKey: String): MoveFolderResult {
         if (!StoragePaths.isKey(key) || !StoragePaths.isKey(targetKey)) return MoveFolderResult.Invalid
-        if (key.isEmpty()) return MoveFolderResult.Failed // a raiz nunca
+        if (StoragePaths.isRoot(key)) return MoveFolderResult.Failed // a raiz nunca
         if (targetKey == key) return MoveFolderResult.Same
         if (targetKey.startsWith("$key/")) return MoveFolderResult.Invalid
         if (targetKey == key.substringBeforeLast('/', "")) return MoveFolderResult.Same
@@ -490,7 +490,7 @@ object LibraryFolders {
         val uri = e.mediaUri ?: return false
         if (Build.VERSION.SDK_INT < 30) return false
         val base = "${Environment.DIRECTORY_DOWNLOADS}/$ROOT_NAME"
-        val newRel = if (targetKey.isEmpty()) "$base/" else "$base/$targetKey/"
+        val newRel = if (StoragePaths.isRoot(targetKey)) "$base/" else "$base/$targetKey/"
         return try {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.RELATIVE_PATH, newRel)
@@ -530,7 +530,7 @@ object LibraryFolders {
      *  TuneGrab/Foo/" — SEMPRE com barra no fim (é o formato do índice). */
     private fun relOf(key: String): String =
         "${Environment.DIRECTORY_DOWNLOADS}/$ROOT_NAME" +
-            if (key.isEmpty()) "/" else "/$key/"
+            if (StoragePaths.isRoot(key)) "/" else "/$key/"
 
     /**
      * RENOMEAR PASTA (v0.22.3) — micaelsan: "eu não consigo deletar pastas
@@ -547,7 +547,7 @@ object LibraryFolders {
     fun renameFolder(ctx: Context, key: String, rawNewName: String): RenameResult {
         if (!StoragePaths.isKey(key)) return RenameResult.Invalid
         // v0.22.4: isEmpty (só a raiz) — pasta de nome em branco agora RENOMEIA
-        if (key.isEmpty()) return RenameResult.Failed // a raiz não tem nome
+        if (StoragePaths.isRoot(key)) return RenameResult.Failed // a raiz não tem nome
         val newName = sanitize(rawNewName) ?: return RenameResult.Invalid
         val currentName = key.substringAfterLast('/')
         if (newName == currentName) return RenameResult.Renamed
@@ -610,7 +610,7 @@ object LibraryFolders {
         // v0.22.4: SÓ a chave VAZIA é a raiz (isEmpty). isBlank pegava também
         // pasta de nome em branco (criada fora do app) — e aí a pasta-fantasma
         // era intocável: "a raiz nunca" pra quem NÃO é raiz.
-        if (key.isEmpty() || !StoragePaths.isKey(key)) return DeleteResult(0, 1) // a raiz nunca
+        if (StoragePaths.isRoot(key) || !StoragePaths.isKey(key)) return DeleteResult(0, 1) // a raiz nunca
         val acc = IntArray(2) // [apagados, falhados]
         try {
             if (isCustomTree(ctx)) {

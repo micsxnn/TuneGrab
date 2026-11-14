@@ -5,6 +5,9 @@ import java.io.IOException
 
 /** Keys from media/document providers are data, never arbitrary filesystem paths. */
 object StoragePaths {
+    /** Whitespace-only folders exist on providers; only the empty key denotes the root. */
+    fun isRoot(value: String): Boolean = value.isEmpty()
+
     fun isName(value: String): Boolean = value.isNotEmpty() && value != "." && value != ".." &&
         value.none { it == '/' || it == '\\' || it.isISOControl() }
 

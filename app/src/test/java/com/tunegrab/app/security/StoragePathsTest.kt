@@ -10,6 +10,11 @@ import java.nio.file.Files
 class StoragePathsTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun only_the_empty_key_is_the_root_not_a_whitespace_folder() {
+        assertTrue(StoragePaths.isRoot(""))
+        for (key in listOf(" ", "  ", "A/ ", "Forró")) assertFalse(StoragePaths.isRoot(key))
+    }
+
     @Test fun root_and_legitimate_nested_names_are_allowed() {
         for (key in listOf("", "Forró", "Forró/2026", "Meu %20 Acústico", " ")) {
             assertTrue(key, StoragePaths.isKey(key))

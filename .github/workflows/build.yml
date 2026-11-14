@@ -40,17 +40,14 @@ jobs:
           python3 -m unittest discover -s tools -p 'test_passgen.py'
       - name: Native JNI regression tests
         run: bash tools/test-native.sh
+      - name: Dependency verification negative control
+        run: bash tools/test-dependency-verification.sh
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --write-verification-metadata sha256 --stacktrace
+        run: ./gradlew testDebugUnitTest --dependency-verification strict --stacktrace
       - name: Build release APK
-        run: ./gradlew assembleRelease securityRuntimeDependencies --write-verification-metadata sha256 --stacktrace
-      - name: Export dependency verification bootstrap
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: dependency-verification-${{ github.run_id }}
-          path: gradle/verification-metadata.xml
-          if-no-files-found: ignore
+        run: ./gradlew assembleRelease securityRuntimeDependencies --dependency-verification strict --stacktrace
+      - name: Dependency lock must remain unchanged
+        run: git diff --exit-code -- gradle/verification-metadata.xml
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

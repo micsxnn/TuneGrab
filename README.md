@@ -314,15 +314,21 @@ som de carro. Para máxima fidelidade sem reconversão, escolha **M4A** ou
 Requisitos: JDK 17, Android SDK 37 e NDK/CMake (o Gradle baixa o que faltar).
 
 ```bash
-./gradlew assembleDebug        # APK de debug (assinado com a chave de debug padrão)
-./gradlew assembleRelease      # APK de release SEM assinatura (o CI assina)
-./gradlew testDebugUnitTest    # testes de unidade (JVM, sem aparelho)
+./gradlew assembleDebug --dependency-verification strict        # APK de debug (assinado com a chave de debug padrão)
+./gradlew assembleRelease --dependency-verification strict      # APK de release SEM assinatura (o CI assina)
+./gradlew testDebugUnitTest --dependency-verification strict    # testes de unidade (JVM, sem aparelho)
 ```
 
 O GitHub Actions roda os testes, compila, assina e publica automaticamente a
 cada tag `v*`.
 
-> **Sobre a assinatura:** a chave de release **não fica no repositório**. Ela
+Os hashes dos artefatos estão em `gradle/verification-metadata.xml`; o build
+falha se uma dependência mudar. Não use `--write-verification-metadata` nem
+desative a verificação para contornar uma falha sem revisar o artefato. Veja
+[`docs/DEPENDENCY_SECURITY.md`](docs/DEPENDENCY_SECURITY.md).
+
+> **Sobre a assinatura:** a chave atual não é versionada. A chave antiga
+> comprometida ainda pode ser recuperada do histórico público. A chave atual
 > vive nos *GitHub Secrets* e o CI assina o APK com rotação v3.1 no Android
 > 13+. Android 7–12 mantêm a chave antiga por compatibilidade: a exposição
 > dessa chave **continua sendo um risco nesses aparelhos**. Detalhes e limites:
