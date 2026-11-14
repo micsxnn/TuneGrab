@@ -138,7 +138,9 @@ dependencies {
     //  3) suporte completo a PoTokenProvider: player request WEB com PoToken (destrava o
     //     bot-check "Sign in to confirm you're not a bot"), client iOS com PoToken e
     //     WEB+PoToken/iOS/visionOS/TV como fallback primário quando os clients anônimos falham.
-    implementation("com.github.micsxnn:NewPipeExtractor:81235e4e48240a540d85eca2fbd6e352f6411043")
+    // JitPack blocks the renamed-owner coordinate (401). Exact binary/POM hashes are locked
+    // in gradle/verification-metadata.xml; never bypass verification to refresh this artifact.
+    implementation("com.github.MicaelSanPedro:NewPipeExtractor:v0.26.5-android4")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Motor de download yt-dlp EMBUTIDO no APK (python 3.12 + yt-dlp + ffmpeg),
