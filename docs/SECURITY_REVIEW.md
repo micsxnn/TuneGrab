@@ -55,6 +55,12 @@ O APK real desse run também foi verificado localmente com `apksig` 8.7.3: chave
 
 As flags de isolamento do yt-dlp foram aceitas pelo executável embutido em um smoke test **offline**, carregando 21 extratores YouTube, sem Generic. Isso não foi um download real em Android. O CI de publicação repete testes, build, enforcement estrito e validação da assinatura antes de liberar os assets.
 
+### Gate estrito concluído antes da publicação
+
+Run [43592609708](https://github.com/micsxnn/TuneGrab/actions/runs/43592609708), commit `08e689a5debae7c56c362cc3d17138e7e0ac73e7`: **119 testes JVM, zero falhas/erros/skips**, gerador, JNI, controle negativo de checksum, testes/build com `--dependency-verification strict` e assinatura concluídos com sucesso. O arquivo de hashes permaneceu inalterado. O grafo runtime gerado foi comparado byte a byte com as 172 coordenadas consultadas na OSV.
+
+O APK desse gate foi novamente verificado localmente com `apksig` 8.7.3 nas três faixas de API. Controles negativos adicionais recusaram fingerprint antiga incorreta, fingerprint nova incorreta e alteração em `classes.dex`. A [evidência resumida](security/strict-validation-2026-11-14.json) descreve esse gate pré-release; o CI da tag repete as validações. Use o `SHA256SUMS` **da própria release** para conferir seu APK, não o checksum de outro run.
+
 ## Limites que não devem ser escondidos
 
 1. **Android 7–12:** a compatibilidade de atualização mantém a chave antiga nesses aparelhos. Não é possível afirmar que a exposição foi resolvida em todos os dispositivos.

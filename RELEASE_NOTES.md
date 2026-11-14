@@ -18,6 +18,6 @@ A migração de assinatura não deve ser desfeita simplesmente republicando um A
 
 ### Validação e limites
 
-Testes automatizados de lógica, convites, caminhos, parsers e JNI; build release; checagem criptográfica de assinatura e linhagem por faixa de Android. Não substituem teste em aparelho de atualização sobre a versão antiga, login, downloads, player e letras.
+**119 testes JVM sem falhas**, regressões do gerador de convites e JNI; build release com verificação estrita das dependências; checagem criptográfica de assinatura e linhagem por faixa de Android. Não substituem teste em aparelho de atualização sobre a versão antiga, login, downloads, player e letras.
 
 Há um aviso residual do Guava condicionado a desserialização Java não confiável, não identificada nas entradas do código do app. O detalhamento e os limites da análise estão em `docs/SECURITY_REVIEW.md` e `docs/DEPENDENCY_SECURITY.md`.

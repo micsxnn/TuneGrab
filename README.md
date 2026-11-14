@@ -412,6 +412,7 @@ versão oficial.
 - [x] **Download da atualização não desiste mais na troca de seção: o aviso de versão nova continua o download no escopo do app e reaparece no ponto em que parou** (v0.22.25)
 - [x] **Player de vídeo com movimento: controles entram e saem deslizando, o play gira ao virar pause, os botões respondem ao toque, a barra desliza sem saltos e o disco dourado ganhou brilho** (v0.22.26)
 - [x] **Aviso de versão nova: o card não troca de release no meio do download e o registro de diagnóstico temporário saiu do app** (v0.22.27)
+- [x] **Revisão de segurança: rotação da assinatura, atualizador validado, proteção de cookies/backup, caminhos/XML/JNI e dependências verificadas** (v0.22.28)
 - [ ] Busca integrada (digitar o nome da música)
 - [ ] **Fase 2: versão Windows (Tauri + yt-dlp)**
 

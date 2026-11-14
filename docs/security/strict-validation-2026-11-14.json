@@ -1,0 +1,29 @@
+{
+  "run_id": 43592609708,
+  "ci_url": "https://github.com/micsxnn/TuneGrab/actions/runs/43592609708",
+  "commit": "08e689a5debae7c56c362cc3d17138e7e0ac73e7",
+  "jvm": {
+    "tests": 119,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "runtime_coordinates": 172,
+  "runtime_graph_matches_reviewed": true,
+  "independently_verified_api_ranges": [
+    "24-27",
+    "28-32",
+    "33-37"
+  ],
+  "legacy_rollback": false,
+  "physical_android_tested": false,
+  "metadata_sha256": "0def6bcbadaaa2080687f10b09fdced8e86b669d5691ec83ba229d2c3799460f",
+  "dependency_mode": "strict; no automatic checksum generation",
+  "negative_checksum_control": "passed: deliberately incorrect Kotlin plugin checksum rejected",
+  "signer_negative_controls": [
+    "incorrect legacy fingerprint rejected",
+    "incorrect new fingerprint rejected",
+    "modified DEX payload rejected"
+  ],
+  "scope_note": "Pre-release validation. The publication workflow repeats the gates. Use SHA256SUMS from the actual release for its APK."
+}
