@@ -73,7 +73,7 @@ object AccessGate {
     )
 
     private const val LIST_URL =
-        "https://raw.githubusercontent.com/MicaelSanPedro/TuneGrab/main/access/passwords.json"
+        "https://raw.githubusercontent.com/micsxnn/TuneGrab/main/access/passwords.json"
 
     /** O MESMO alfabeto do gerador (sem 0/O/1/I/L — 31 chars). */
     internal const val ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
