@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -73,17 +71,19 @@ class SearchViewModel(
     }
 
     companion object {
-        fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val appContext = context.applicationContext
-                SearchViewModel(
-                    HybridSearchService(
-                        primary = YtDlpSearchProvider(appContext),
-                        fallback = NewPipeSearchProvider()
-                    )
-                )
+        fun factory(context: Context): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val appContext = context.applicationContext
+                    return SearchViewModel(
+                        HybridSearchService(
+                            primary = YtDlpSearchProvider(appContext),
+                            fallback = NewPipeSearchProvider()
+                        )
+                    ) as T
+                }
             }
-        }
     }
 }
 
