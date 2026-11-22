@@ -1,11 +1,19 @@
-## Ícone do card de atualização corrigido
+## v0.22.30
 
-- O card de atualização no Início agora mostra o símbolo de **download**, em vez do símbolo de histórico.
-- Alteração apenas visual: cores, tamanho, barra de progresso e funcionamento do download/instalação continuam iguais.
-- Mantidas as correções de segurança e a assinatura da v0.22.28. O número interno da versão foi incrementado para permitir atualizar normalmente sobre ela.
+### Novidades
+
+- **Busca de músicas dentro do TuneGrab**: abra a aba **Busca**, digite o nome da música ou do artista e veja os resultados sem precisar copiar links do YouTube.
+- **Download direto**: toque no resultado ou no botão de download para abrir o seletor de formato e começar o download.
+- **Busca mais resistente**: o yt-dlp embarcado faz a consulta principal e o NewPipeExtractor entra como reserva apenas se a busca principal falhar.
+- **Duração dos resultados**: cada música encontrada mostra o tempo da faixa quando essa informação está disponível.
+- **Acesso direto**: a senha, o convite e a tela de bloqueio foram removidos. O TuneGrab abre normalmente em qualquer aparelho.
+
+### Correções
+
+- Corrigida a compilação da busca integrada.
+- Corrigido o botão de download dos resultados.
+- Resultados de buscas antigas não substituem mais uma busca mais recente.
 
 ### Assinatura e compatibilidade
 
-Android 13+ continuam usando a chave nova com linhagem de rotação. Android 7–12 ainda usam a chave antiga comprometida para preservar compatibilidade. Baixe somente pelo repositório oficial.
-
-Os demais limites da revisão de segurança permanecem documentados em [SECURITY_REVIEW.md](https://github.com/micsxnn/TuneGrab/blob/v0.22.29/docs/SECURITY_REVIEW.md) e [SIGNING.md](https://github.com/micsxnn/TuneGrab/blob/v0.22.29/docs/SIGNING.md).
+A assinatura e o processo de atualização continuam iguais aos das versões anteriores. Baixe somente pelo repositório oficial.

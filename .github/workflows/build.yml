@@ -34,10 +34,8 @@ jobs:
         uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-      - name: Invitation generator self-test
-        run: |
-          python3 tools/passgen.py --selftest
-          python3 -m unittest discover -s tools -p 'test_passgen.py'
+      - name: Access lock regression test
+        run: node scripts/tests/no-access-lock.test.js
       - name: Native JNI regression tests
         run: bash tools/test-native.sh
       - name: Dependency verification negative control
