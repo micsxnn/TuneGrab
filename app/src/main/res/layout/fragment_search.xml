@@ -42,12 +42,15 @@
         app:cornerRadius="14dp" />
 
     <!-- Indicador de progresso -->
-    <com.google.android.material.progressindicator.CircularProgressIndicator
+    <ProgressBar
         android:id="@+id/progress"
+        style="?android:attr/progressBarStyleLarge"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="center"
         android:layout_marginTop="24dp"
+        android:indeterminate="true"
+        android:indeterminateTint="@color/primary"
         android:visibility="gone" />
 
     <!-- Texto de status -->

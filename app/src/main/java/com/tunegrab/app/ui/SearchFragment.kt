@@ -110,7 +110,11 @@ class SearchFragment : Fragment() {
                     viewModel.searchResults.collectLatest { results ->
                         adapter.updateResults(results)
                         binding.recyclerViewResults.visibility = if (results.isEmpty()) View.GONE else View.VISIBLE
-                        binding.tvEmpty.visibility = if (results.isEmpty()) View.VISIBLE else View.GONE
+                        binding.tvEmpty.visibility = if (results.isEmpty() && !viewModel.uiState.value.isSearching) {
+                            View.VISIBLE
+                        } else {
+                            View.GONE
+                        }
                     }
                 }
             }
@@ -119,7 +123,13 @@ class SearchFragment : Fragment() {
 
     private fun updateUi(state: SearchUiState) {
         binding.progress.visibility = if (state.isSearching) View.VISIBLE else View.GONE
+        binding.progress.isIndeterminate = state.isSearching
         binding.btnSearch.isEnabled = !state.isSearching
+        binding.tvEmpty.visibility = if (!state.isSearching && state.results.isEmpty() && state.error == null) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
 
         binding.tvStatus.visibility = if (state.isSearching || state.error != null) View.VISIBLE else View.GONE
 

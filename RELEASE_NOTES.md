@@ -1,19 +1,14 @@
-## v0.22.30
-
-### Novidades
-
-- **Busca de músicas dentro do TuneGrab**: abra a aba **Busca**, digite o nome da música ou do artista e veja os resultados sem precisar copiar links do YouTube.
-- **Download direto**: toque no resultado ou no botão de download para abrir o seletor de formato e começar o download.
-- **Busca mais resistente**: o yt-dlp embarcado faz a consulta principal e o NewPipeExtractor entra como reserva apenas se a busca principal falhar.
-- **Duração dos resultados**: cada música encontrada mostra o tempo da faixa quando essa informação está disponível.
-- **Acesso direto**: a senha, o convite e a tela de bloqueio foram removidos. O TuneGrab abre normalmente em qualquer aparelho.
+## v0.22.31
 
 ### Correções
 
-- Corrigida a compilação da busca integrada.
-- Corrigido o botão de download dos resultados.
-- Resultados de buscas antigas não substituem mais uma busca mais recente.
+- **Busca corrigida**: a busca usa primeiro o NewPipeExtractor, como no NewPipe e no YTDLnis, e usa o yt-dlp apenas como reserva. Uma resposta vazia também aciona a reserva.
+- **Resultados do yt-dlp corrigidos**: o formato JSON retornado pela busca agora é interpretado corretamente, incluindo título, canal, duração, thumbnail e URL canônica.
+- **Carregamento visível**: o indicador de progresso aparece durante toda a consulta e a mensagem “Nenhum resultado” só aparece depois que a busca termina.
 
-### Assinatura e compatibilidade
+### Continua igual
 
-A assinatura e o processo de atualização continuam iguais aos das versões anteriores. Baixe somente pelo repositório oficial.
+- O download direto pelo resultado continua usando o seletor de formato e o fluxo seguro já existente.
+- A assinatura e a verificação dos APKs continuam iguais às versões anteriores.
+
+Baixe somente pelo repositório oficial.

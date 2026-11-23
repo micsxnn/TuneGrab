@@ -33,7 +33,6 @@ class YtDlpSearchProvider(
                 addOption("--no-warnings")
                 addOption("--socket-timeout", "20")
                 addOption("--sleep-requests", "1")
-                addOption("--flat-playlist")
                 addOption("--dump-single-json")
                 addOption("--skip-download")
             }

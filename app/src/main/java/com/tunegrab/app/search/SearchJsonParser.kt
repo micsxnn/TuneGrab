@@ -25,7 +25,9 @@ object SearchJsonParser {
 
     fun parse(json: String, maxResults: Int = MAX_RESULTS): List<ProcessedSearchResult> {
         val root = JSONObject(json)
-        val entries = root.optJSONArray("entries") ?: JSONArray()
+        val entries = root.optJSONArray("entries")
+            ?: root.optJSONArray("items")
+            ?: JSONArray()
         val limit = maxResults.coerceIn(0, MAX_RESULTS)
         val seen = linkedSetOf<String>()
         val results = mutableListOf<ProcessedSearchResult>()
@@ -46,8 +48,10 @@ object SearchJsonParser {
 
         val rawUrl = optString("webpage_url").trim()
             .ifEmpty { optString("url").trim() }
+            .ifEmpty { optString("videoUrl").trim() }
         if (rawUrl.contains("/playlist?") || rawUrl.contains("/list?")) return null
         val rawId = optString("id").trim()
+            .ifEmpty { optString("videoId").trim() }
         val url = when {
             rawUrl.startsWith("https://www.youtube.com/watch?v=") -> rawUrl
             rawUrl.startsWith("https://youtu.be/") -> rawUrl
@@ -61,14 +65,14 @@ object SearchJsonParser {
 
         val channel = optString("uploader").trim()
             .ifEmpty { optString("channel").trim() }
+            .ifEmpty { optString("author").trim() }
             .ifEmpty { optString("uploader_id").trim() }
         val thumbnail = optString("thumbnail").trim()
+            .ifEmpty { optString("thumbnailUrl").trim() }
             .ifEmpty { largestThumbnailUrl() }
-        val duration = if (optDouble("duration", 0.0) > 0.0) {
-            optDouble("duration", 0.0).toLong()
-        } else {
-            null
-        }
+        val durationSeconds = optDouble("duration", 0.0).toLong()
+            .takeIf { it > 0 }
+            ?: optLong("durationSec", 0L).takeIf { it > 0 }
 
         return ProcessedSearchResult(
             videoId = videoId,
@@ -77,7 +81,7 @@ object SearchJsonParser {
             channel = channel,
             thumbnailUrl = thumbnail.ifEmpty { null },
             description = optString("description").trim(),
-            durationSec = duration
+            durationSec = durationSeconds
         )
     }
 

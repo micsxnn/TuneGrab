@@ -14,7 +14,12 @@ class HybridSearchService(
     ): List<ProcessedSearchResult> {
         val normalizedQuery = SearchQuery.normalize(query)
         return try {
-            primary.search(normalizedQuery, maxResults)
+            val primaryResults = primary.search(normalizedQuery, maxResults)
+            if (primaryResults.isNotEmpty()) {
+                primaryResults
+            } else {
+                fallback.search(normalizedQuery, maxResults)
+            }
         } catch (primaryError: SearchProviderException) {
             try {
                 fallback.search(normalizedQuery, maxResults)

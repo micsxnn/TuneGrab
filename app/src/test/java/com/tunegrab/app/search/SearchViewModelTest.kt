@@ -1,5 +1,7 @@
 package com.tunegrab.app.search
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,7 +23,8 @@ class SearchViewModelTest {
     fun `estado Searching fica visivel enquanto a busca aguarda`() = runBlocking {
         val gate = kotlinx.coroutines.CompletableDeferred<List<ProcessedSearchResult>>()
         val service = SearchProvider { _, _ -> gate.await() }
-        val viewModel = SearchViewModel(service)
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val viewModel = SearchViewModel(service, scope)
 
         viewModel.search("música")
 
@@ -34,7 +37,8 @@ class SearchViewModelTest {
     @Test
     fun `estado final guarda resultados`() = runBlocking {
         val service = SearchProvider { _, _ -> listOf(result("one")) }
-        val viewModel = SearchViewModel(service)
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val viewModel = SearchViewModel(service, scope)
 
         viewModel.search("música")
 

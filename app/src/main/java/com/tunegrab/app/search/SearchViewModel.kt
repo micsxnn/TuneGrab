@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -12,7 +13,8 @@ import kotlinx.coroutines.launch
  * ViewModel para gerenciar a busca de músicas
  */
 class SearchViewModel(
-    private val searchService: SearchProvider
+    private val searchService: SearchProvider,
+    private val searchScope: CoroutineScope = viewModelScope
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState
@@ -35,7 +37,7 @@ class SearchViewModel(
         currentQuery = normalizedQuery
         _uiState.value = SearchUiState(isSearching = true, query = normalizedQuery)
 
-        viewModelScope.launch {
+        searchScope.launch {
             try {
                 val results = searchService.search(normalizedQuery, 25)
                 if (token != searchToken) return@launch
@@ -78,9 +80,9 @@ class SearchViewModel(
                     val appContext = context.applicationContext
                     return SearchViewModel(
                         HybridSearchService(
-                            primary = YtDlpSearchProvider(appContext),
-                            fallback = NewPipeSearchProvider()
-                        )
+                        primary = NewPipeSearchProvider(),
+                        fallback = YtDlpSearchProvider(appContext)
+                    )
                     ) as T
                 }
             }
