@@ -77,10 +77,53 @@ class SearchJsonParserTest {
     }
 
     @Test
+    fun `parse aceita formato url de video do yt-dlp`() {
+        val json = """
+            {"entries":[{
+              "_type":"url",
+              "ie_key":"Youtube",
+              "id":"abc12345678",
+              "title":"Song",
+              "url":"https://www.youtube.com/watch?v=abc12345678",
+              "duration":125,
+              "channel":"Artist",
+              "thumbnails":[{"url":"https://img.test/song.jpg","width":480,"height":360}]
+            }]}
+        """.trimIndent()
+
+        val result = SearchJsonParser.parse(json).single()
+
+        assertEquals("abc12345678", result.videoId)
+        assertEquals("https://www.youtube.com/watch?v=abc12345678", result.webUrl)
+        assertEquals("Artist", result.channel)
+        assertEquals(125L, result.durationSec)
+    }
+
+    @Test
+    fun `parse aceita resultado do NewPipe normalizado`() {
+        val json = """
+            {"items":[{
+              "videoId":"abc12345678",
+              "title":"Song",
+              "author":"Artist",
+              "durationSec":125,
+              "thumbnailUrl":"https://img.test/song.jpg"
+            }]}
+        """.trimIndent()
+
+        val result = SearchJsonParser.parse(json).single()
+
+        assertEquals("abc12345678", result.videoId)
+        assertEquals("https://www.youtube.com/watch?v=abc12345678", result.webUrl)
+        assertEquals("Artist", result.channel)
+        assertEquals(125L, result.durationSec)
+    }
+
+    @Test
     fun `parse descarta playlist e id invalido`() {
         val json = """
             {"entries":[
-              {"id":"PL123","title":"Playlist","url":"https://www.youtube.com/playlist?list=PL123"},
+              {"id":"PL12345678","title":"Playlist","url":"https://www.youtube.com/playlist?list=PL12345678"},
               {"id":"bad id","title":"Invalid","webpage_url":"https://www.youtube.com/watch?v=bad id"}
             ]}
         """.trimIndent()
