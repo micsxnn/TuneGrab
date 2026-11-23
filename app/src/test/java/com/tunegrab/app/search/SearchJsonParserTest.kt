@@ -11,20 +11,20 @@ class SearchJsonParserTest {
         val json = """
             {
               "entries": [{
-                "id": "abc12345678",
+                "id": "abc1234567",
                 "title": "Song",
                 "uploader": "Artist",
                 "duration": 125,
                 "thumbnail": "https://img.test/song.jpg",
-                "webpage_url": "https://www.youtube.com/watch?v=abc12345678"
+                "webpage_url": "https://www.youtube.com/watch?v=abc1234567"
               }]
             }
         """.trimIndent()
 
         val result = SearchJsonParser.parse(json).single()
 
-        assertEquals("abc12345678", result.videoId)
-        assertEquals("https://www.youtube.com/watch?v=abc12345678", result.webUrl)
+        assertEquals("abc1234567", result.videoId)
+        assertEquals("https://www.youtube.com/watch?v=abc1234567", result.webUrl)
         assertEquals("Song", result.title)
         assertEquals("Artist", result.channel)
         assertEquals("https://img.test/song.jpg", result.thumbnailUrl)
@@ -35,25 +35,25 @@ class SearchJsonParserTest {
     fun `parse usa url quando webpage_url falta`() {
         val json = """
             {"entries":[{
-              "id":"xyz78901234",
+              "id":"xyz7890123",
               "title":"Fallback",
-              "url":"https://www.youtube.com/watch?v=xyz78901234"
+              "url":"https://www.youtube.com/watch?v=xyz7890123"
             }]}
         """.trimIndent()
 
         val result = SearchJsonParser.parse(json).single()
 
-        assertEquals("xyz78901234", result.videoId)
-        assertEquals("https://www.youtube.com/watch?v=xyz78901234", result.webUrl)
+        assertEquals("xyz7890123", result.videoId)
+        assertEquals("https://www.youtube.com/watch?v=xyz7890123", result.webUrl)
     }
 
     @Test
     fun `parse usa maior thumbnail disponivel`() {
         val json = """
             {"entries":[{
-              "id":"abc12345678",
+              "id":"abc1234567",
               "title":"Song",
-              "webpage_url":"https://www.youtube.com/watch?v=abc12345678",
+              "webpage_url":"https://www.youtube.com/watch?v=abc1234567",
               "thumbnails":[
                 {"url":"https://img.test/small.jpg","width":120,"height":90},
                 {"url":"https://img.test/large.jpg","width":1280,"height":720}
@@ -69,11 +69,11 @@ class SearchJsonParserTest {
 
     @Test
     fun `parse usa url canonica quando entrada tem apenas id`() {
-        val json = """{"entries":[{"id":"abc12345678","title":"Song"}]}"""
+        val json = """{"entries":[{"id":"abc1234567","title":"Song"}]}"""
 
         val result = SearchJsonParser.parse(json).single()
 
-        assertEquals("https://www.youtube.com/watch?v=abc12345678", result.webUrl)
+        assertEquals("https://www.youtube.com/watch?v=abc1234567", result.webUrl)
     }
 
     @Test
@@ -91,7 +91,7 @@ class SearchJsonParserTest {
     @Test
     fun `parse limita quantidade de resultados`() {
         val entries = (1..30).joinToString(",") { index ->
-            val id = "id%08d".format(index)
+            val id = "id%09d".format(index)
             """{"id":"$id","title":"Song $index","webpage_url":"https://www.youtube.com/watch?v=$id"}"""
         }
 
@@ -102,8 +102,8 @@ class SearchJsonParserTest {
     fun `parse remove duplicatas por id`() {
         val json = """
             {"entries":[
-              {"id":"same00000001","title":"First","webpage_url":"https://www.youtube.com/watch?v=same00000001"},
-              {"id":"same00000001","title":"Second","webpage_url":"https://www.youtube.com/watch?v=same00000001"}
+              {"id":"same0000000","title":"First","webpage_url":"https://www.youtube.com/watch?v=same0000000"},
+              {"id":"same0000000","title":"Second","webpage_url":"https://www.youtube.com/watch?v=same0000000"}
             ]}
         """.trimIndent()
 
