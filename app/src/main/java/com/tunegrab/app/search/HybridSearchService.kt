@@ -15,7 +15,7 @@ class HybridSearchService(
         val normalizedQuery = SearchQuery.normalize(query)
         return try {
             primary.search(normalizedQuery, maxResults)
-        } catch (primaryError: Exception) {
+        } catch (primaryError: SearchProviderException) {
             try {
                 fallback.search(normalizedQuery, maxResults)
             } catch (fallbackError: Exception) {

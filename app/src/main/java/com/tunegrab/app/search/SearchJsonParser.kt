@@ -21,7 +21,7 @@ object SearchQuery {
 
 object SearchJsonParser {
     private const val MAX_RESULTS = 25
-    private val videoIdPattern = Regex("^[A-Za-z0-9_-]{1,20}$")
+    private val videoIdPattern = Regex("^[A-Za-z0-9_-]{11}$")
 
     fun parse(json: String, maxResults: Int = MAX_RESULTS): List<ProcessedSearchResult> {
         val root = JSONObject(json)

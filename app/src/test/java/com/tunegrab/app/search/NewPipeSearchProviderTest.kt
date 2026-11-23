@@ -11,7 +11,7 @@ class NewPipeSearchProviderTest {
         val provider = NewPipeSearchProvider { _, _ ->
             listOf(
                 ProcessedSearchResult(
-                    videoId = "abc123",
+                    videoId = "abc12345678",
                     webUrl = "",
                     title = "Song",
                     channel = "Artist",
@@ -23,6 +23,6 @@ class NewPipeSearchProviderTest {
 
         val result = provider.search("música", 25).single()
 
-        assertEquals("https://www.youtube.com/watch?v=abc123", result.webUrl)
+        assertEquals("https://www.youtube.com/watch?v=abc12345678", result.webUrl)
     }
 }

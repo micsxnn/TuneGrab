@@ -56,6 +56,6 @@ class YtDlpSearchProvider(
 
     private companion object {
         const val TAG = "YtDlpSearchProvider"
-        const val SEARCH_TIMEOUT_MS = 45_000L
+        const val SEARCH_TIMEOUT_MS = 20_000L
     }
 }

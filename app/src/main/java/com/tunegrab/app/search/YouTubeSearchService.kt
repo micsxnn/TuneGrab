@@ -21,7 +21,7 @@ object YouTubeSearchService {
     private const val TAG = "YouTubeSearchService"
     private const val DEFAULT_MAX_RESULTS = 25
 
-    private var initialized = false
+    @Volatile private var initialized = false
 
     /**
      * Inicializa o serviço (usa o mesmo init do YtExtractor)
