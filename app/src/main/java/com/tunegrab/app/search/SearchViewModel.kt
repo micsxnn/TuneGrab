@@ -14,8 +14,12 @@ import kotlinx.coroutines.launch
  */
 class SearchViewModel(
     private val searchService: SearchProvider,
-    private val searchScope: CoroutineScope = viewModelScope
+    // v0.22.31: o Kotlin não aceita `= viewModelScope` como valor padrão de
+    // parâmetro (acessa <this> antes da instância existir e derruba o build).
+    // O escopo vem opcional e é resolvido no corpo, onde <this> já é válido.
+    private val searchScope: CoroutineScope? = null
 ) : ViewModel() {
+    private val scope: CoroutineScope = searchScope ?: viewModelScope
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState
 
@@ -37,7 +41,7 @@ class SearchViewModel(
         currentQuery = normalizedQuery
         _uiState.value = SearchUiState(isSearching = true, query = normalizedQuery)
 
-        searchScope.launch {
+        scope.launch {
             try {
                 val results = searchService.search(normalizedQuery, 25)
                 if (token != searchToken) return@launch
