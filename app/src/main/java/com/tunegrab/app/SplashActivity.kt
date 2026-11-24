@@ -7,8 +7,6 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
-import com.tunegrab.app.access.AccessGate
-import com.tunegrab.app.access.LockActivity
 
 /**
  * Loader de abertura: logo + "Bem-vindo" em cursiva e, NO RODAPÉ, a versão
@@ -21,11 +19,6 @@ import com.tunegrab.app.access.LockActivity
  *
  * Links compartilhados/abertos (ACTION_SEND/VIEW) continuam indo direto
  * para a MainActivity — o splash só aparece na abertura pelo ícone.
- *
- * v0.20.0: o roteamento ganhou a TRAVA DE ACESSO na frente de tudo —
- * aparelho sem senha liberada vai pra LockActivity (nem o tutorial nem a
- * barra aparecem antes do convite ser aceito). A checagem é local (flag),
- * leve — a rede só entra DENTRO da LockActivity.
  */
 class SplashActivity : AppCompatActivity() {
 
@@ -68,11 +61,7 @@ class SplashActivity : AppCompatActivity() {
                 // autor) — só depois dele é que a barra montada aparece.
                 // Links compartilhados/abertos não passam por aqui de
                 // propósito: quem mandou um link sabe o que está fazendo.
-                // v0.20.0: ANTES de qualquer um dos dois, a trava de convite
-                // — sem senha liberada, nem tutorial nem barra (quem libera
-                // é a LockActivity, e ela mesma roteia o próximo passo).
                 val next = when {
-                    !AccessGate.isUnlocked(this) -> LockActivity::class.java
                     !OnboardingActivity.isDone(this) -> OnboardingActivity::class.java
                     else -> MainActivity::class.java
                 }

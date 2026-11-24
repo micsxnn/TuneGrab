@@ -1,11 +1,14 @@
-## Ícone do card de atualização corrigido
+## v0.22.31
 
-- O card de atualização no Início agora mostra o símbolo de **download**, em vez do símbolo de histórico.
-- Alteração apenas visual: cores, tamanho, barra de progresso e funcionamento do download/instalação continuam iguais.
-- Mantidas as correções de segurança e a assinatura da v0.22.28. O número interno da versão foi incrementado para permitir atualizar normalmente sobre ela.
+### Correções
 
-### Assinatura e compatibilidade
+- **Busca corrigida**: a busca usa primeiro o NewPipeExtractor, como no NewPipe e no YTDLnis, e usa o yt-dlp apenas como reserva. Uma resposta vazia também aciona a reserva.
+- **Resultados do yt-dlp corrigidos**: o formato JSON retornado pela busca agora é interpretado corretamente, incluindo título, canal, duração, thumbnail e URL canônica.
+- **Carregamento visível**: o indicador de progresso aparece durante toda a consulta e a mensagem “Nenhum resultado” só aparece depois que a busca termina.
 
-Android 13+ continuam usando a chave nova com linhagem de rotação. Android 7–12 ainda usam a chave antiga comprometida para preservar compatibilidade. Baixe somente pelo repositório oficial.
+### Continua igual
 
-Os demais limites da revisão de segurança permanecem documentados em [SECURITY_REVIEW.md](https://github.com/micsxnn/TuneGrab/blob/v0.22.29/docs/SECURITY_REVIEW.md) e [SIGNING.md](https://github.com/micsxnn/TuneGrab/blob/v0.22.29/docs/SIGNING.md).
+- O download direto pelo resultado continua usando o seletor de formato e o fluxo seguro já existente.
+- A assinatura e a verificação dos APKs continuam iguais às versões anteriores.
+
+Baixe somente pelo repositório oficial.

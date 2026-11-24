@@ -169,9 +169,7 @@ pastas TuneGrab são reencontradas pelo MediaStore.
 
 ### Controle e segurança
 
-- **Trava de acesso por convite**: o app abre atrás de senha. Cada senha nasce
-  de um convite e **fica presa ao aparelho** que ativou; passar a senha adiante
-  não dá acesso em outro celular no aplicativo oficial. A trava é local:
+- **Acesso direto**: o app abre sem senha, convite ou tela de bloqueio no aplicativo oficial. A trava é local:
   um APK modificado pode removê-la; não equivale a autorização por servidor
 - **Atualização automática**: o card de versão nova aparece no Início, com o
   changelog em texto leigo; baixar e instalar acontecem **dentro do app**, com
@@ -391,7 +389,7 @@ versão oficial.
 - [x] **Barra de download full-width, login automático do YouTube e seleção múltipla para apagar na Biblioteca** (v0.19.7–0.19.8)
 - [x] **Configurações em pastas (estilo YouTube) e aviso de update no Início** (v0.19.9)
 - [x] **Reprodução automática por música (estilo YouTube) com regente nas Configurações** (v0.19.20–0.19.21)
-- [x] **Trava de acesso por convite: senha de uso único derivada do nome e presa no aparelho que ativou** (v0.20.0–0.21.0)
+- [x] **Acesso direto, sem senha ou tela de bloqueio** (v0.22.30)
 - [x] **Pastas de verdade na Biblioteca: criar, navegar, mover estilo gerenciador de arquivos, renomear e apagar, além de busca** (v0.22.0–0.22.6)
 - [x] **Letra sincronizada: linha acende no tempo do som e a tela anda sozinha (LRCLIB, busca em escada com 89% de cobertura real)** (v0.22.7–0.22.8)
 - [x] **Paleta dourada: o app sai do violeta e veste ouro (contrastes AA conferidos dígito a dígito)** (v0.22.9)
