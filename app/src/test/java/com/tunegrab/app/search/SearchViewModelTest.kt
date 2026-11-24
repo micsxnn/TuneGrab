@@ -19,8 +19,10 @@ class SearchViewModelTest {
         description = ""
     )
 
+    // `: Unit` explícito: a última expressão (gate.complete) devolve Boolean e
+    // métodos @Test precisam ser void, senão o JUnit 4 rejeita a classe inteira.
     @Test
-    fun `estado Searching fica visivel enquanto a busca aguarda`() = runBlocking {
+    fun `estado Searching fica visivel enquanto a busca aguarda`(): Unit = runBlocking {
         val gate = kotlinx.coroutines.CompletableDeferred<List<ProcessedSearchResult>>()
         val service = SearchProvider { _, _ -> gate.await() }
         val scope = CoroutineScope(Dispatchers.Unconfined)
