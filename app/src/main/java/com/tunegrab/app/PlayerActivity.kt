@@ -45,6 +45,7 @@ import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.tunegrab.app.databinding.ActivityPlayerBinding
 import com.tunegrab.app.playback.PlaybackService
+import com.tunegrab.app.ui.SystemBars
 import com.tunegrab.app.yt.DownloaderImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -182,8 +183,18 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ANDROID 15 (v0.22.31): edge-to-edge em todas as versões — barras
+        // transparentes, vídeo e arte passam por baixo delas
+        SystemBars.edgeToEdge(this)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Controles respeitam as barras: os de ÁUDIO (centro da tela) ganham
+        // topo e pé seguros; o overlay de vídeo ganha pé (a barra de
+        // progresso mora no rodapé). Em TELA CHEIA as barras escondem e os
+        // insets zeram sozinhos — os controles voltam ao centro cheio.
+        SystemBars.pad(binding.audioControls, top = true, bottom = true)
+        SystemBars.pad(binding.videoControls.root, bottom = true)
 
         // REPRODUÇÃO AUTOMÁTICA (v0.19.21): abrir o player do zero SEMPRE
         // recomeça do padrão das Configurações — o valor escolhido no switch
@@ -872,7 +883,10 @@ class PlayerActivity : AppCompatActivity() {
             controller.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         } else {
-            WindowCompat.setDecorFitsSystemWindows(window, true)
+            // v0.22.31: o edge-to-edge é PERMANENTE (regra do Android 15) —
+            // sair da tela cheia só MOSTRA as barras de novo; o
+            // decorFitsSystemWindows fica false pra sempre e as áreas
+            // seguras ficam por conta dos paddings de inset (onCreate)
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }

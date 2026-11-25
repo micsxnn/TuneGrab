@@ -7,6 +7,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import com.tunegrab.app.ui.SystemBars
 
 /**
  * Tela de relatório de erro. Usada em dois cenários:
@@ -18,7 +19,11 @@ class CrashReportActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ANDROID 15 (v0.22.31): barras transparentes — o relatório respira
+        // fora das barras de status e de navegação
+        SystemBars.edgeToEdge(this)
         setContentView(R.layout.activity_crash_report)
+        SystemBars.pad(findViewById(android.R.id.content), top = true, bottom = true)
 
         val fromNotification = intent.getBooleanExtra(EXTRA_FROM_NOTIFICATION, false)
         val report = intent.getStringExtra(EXTRA_REPORT)

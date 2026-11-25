@@ -22,6 +22,7 @@ import com.tunegrab.app.lyrics.LyricsRepository
 import com.tunegrab.app.lyrics.LyricsResult
 import com.tunegrab.app.lyrics.LyricsSource
 import com.tunegrab.app.playback.PlaybackService
+import com.tunegrab.app.ui.SystemBars
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -96,8 +97,12 @@ class LyricsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ANDROID 15 (v0.22.31): barras transparentes — o cabeçalho nasce
+        // abaixo da status bar e o crédito fica acima da barra de navegação
+        SystemBars.edgeToEdge(this)
         binding = ActivityLyricsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        SystemBars.pad(binding.root, top = true, bottom = true)
 
         binding.btnBack.setOnClickListener { finish() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {

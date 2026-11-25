@@ -8,6 +8,7 @@ import com.tunegrab.app.databinding.ActivityMainBinding
 import com.tunegrab.app.download.DownloadService
 import com.tunegrab.app.ui.BottomNav
 import com.tunegrab.app.ui.HomeFragment
+import com.tunegrab.app.ui.SystemBars
 
 /**
  * Hospedeiro das abas (Início · YouTube · Downloads · Favoritos ·
@@ -31,8 +32,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ANDROID 15 (v0.22.31): edge-to-edge em todas as versões — barras
+        // do sistema transparentes, o app desenha por baixo (do 7 ao 15)
+        SystemBars.edgeToEdge(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Áreas seguras na mão (as barras transparentes não reservam mais
+        // espaço): o conteúdo das abas nasce abaixo da barra de status e a
+        // barra de abas desce até embaixo. withIme: o TECLADO levanta a
+        // barra (e o container encolhe) — o adjustResize clássico não
+        // existe mais no mundo edge-to-edge.
+        SystemBars.pad(binding.fragmentContainer, top = true)
+        SystemBars.pad(binding.navBar.root, bottom = true, withIme = true)
+
         BottomNav.setup(this, binding.navBar.bottomNav, R.id.fragmentContainer, R.id.navHome)
         handleIntent(intent)
     }

@@ -6,6 +6,7 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.tunegrab.app.ui.SystemBars
 
 
 /**
@@ -24,11 +25,15 @@ class SplashActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ANDROID 15 (v0.22.31): barras transparentes também no loader —
+        // o rodapé (versão + assinatura) fica acima da barra de navegação
+        SystemBars.edgeToEdge(this)
         setContentView(R.layout.activity_splash)
 
         val logo = findViewById<View>(R.id.imgLogo)
         val welcome = findViewById<TextView>(R.id.txtWelcome)
         val footer = findViewById<View>(R.id.footerGroup)
+        SystemBars.pad(footer, bottom = true)
         val version = findViewById<TextView>(R.id.txtVersion)
 
         // rodapé: "v0.18.10  ·  feito por" + nome em LedTextView (no XML) —

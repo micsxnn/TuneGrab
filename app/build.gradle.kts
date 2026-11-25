@@ -10,14 +10,16 @@ plugins {
 android {
     namespace = "com.tunegrab.app"
     // 34 → 37 (v0.22.16): o Backdrop 2.x e o Compose BOM 2026.06.01 do
-    // LastWave exigem APIs novas. targetSdk continua 34 — comportamento
-    // do app em runtime não muda.
+    // LastWave exigem APIs novas. O targetSdk acompanhou: 35 na v0.22.31.
     compileSdk = 37
 
     defaultConfig {
         applicationId = "com.tunegrab.app"
         minSdk = 24
-        targetSdk = 34
+        // ANDROID 15 (v0.22.31): targetSdk 35 — o edge-to-edge (barras
+        // transparentes, app por baixo) vira obrigatório no 15, e o
+        // ui/SystemBars.kt aplica o MESMO visual do Android 7 ao 15.
+        targetSdk = 35
         versionCode = 104
         versionName = "0.22.31"
 

@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.tunegrab.app.databinding.ActivityOnboardingBinding
+import com.tunegrab.app.ui.SystemBars
 import kotlin.math.roundToInt
 
 /**
@@ -46,8 +47,12 @@ class OnboardingActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ANDROID 15 (v0.22.31): barras transparentes — o tutorial nasce
+        // abaixo da status bar e os botões ficam acima da barra de navegação
+        SystemBars.edgeToEdge(this)
         binding = ActivityOnboardingBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        SystemBars.pad(binding.root, top = true, bottom = true)
 
         binding.pager.adapter = PageAdapter()
         binding.pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
